@@ -1,0 +1,26 @@
+.feedback {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 1rem;
+  background: var(--card-bg);
+  display: grid;
+  gap: 0.55rem;
+}
+
+.feedback h3 {
+  margin: 0;
+}
+
+.feedback p {
+  margin: 0;
+  color: var(--text-soft);
+}
+
+.feedback--error {
+  border-color: #ffc8c8;
+  background: #fff5f5;
+}
+
+.feedback--loading {
+  gap: 0.75rem;
+}

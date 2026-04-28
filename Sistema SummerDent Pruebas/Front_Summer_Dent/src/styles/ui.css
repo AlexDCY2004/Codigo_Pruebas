@@ -1,0 +1,128 @@
+.ui-btn {
+  border: none;
+  border-radius: 10px;
+  padding: 0.7rem 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ui-btn--block {
+  width: 100%;
+}
+
+.ui-btn--primary {
+  background: var(--primary);
+  color: #fff;
+}
+
+.ui-btn--primary:hover {
+  background: var(--primary-press);
+}
+
+.ui-btn--secondary {
+  background: #fff;
+  color: var(--text-main);
+  border: 1px solid var(--line);
+}
+
+.ui-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.ui-field {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.ui-field__label {
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.ui-input {
+  width: 100%;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  outline: none;
+  font-size: 0.95rem;
+}
+
+.ui-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(31, 111, 235, 0.18);
+}
+
+.ui-input--error {
+  border-color: var(--danger);
+}
+
+.ui-field__error {
+  color: var(--danger);
+  font-size: 0.84rem;
+}
+
+.ui-card {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 1rem;
+  background: var(--card-bg);
+  box-shadow: 0 10px 20px rgba(16, 32, 56, 0.06);
+}
+
+.ui-card__title {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.ui-card__description {
+  margin: 0.45rem 0 0.9rem;
+  color: var(--text-soft);
+  font-size: 0.9rem;
+}
+
+.ui-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.ui-badge--ok {
+  background: #e4f8ea;
+  color: #1d7c45;
+}
+
+.ui-badge--info {
+  background: #e8f2ff;
+  color: #1f5fb8;
+}
+
+.ui-badge--warning {
+  background: #fff3df;
+  color: #9d5c0f;
+}
+
+.ui-badge--neutral {
+  background: #eef2f8;
+  color: #40506a;
+}
+
+.ui-skeleton {
+  border-radius: 8px;
+  background: linear-gradient(90deg, #e8edf6 0%, #f5f8fd 50%, #e8edf6 100%);
+  background-size: 300% 100%;
+  animation: shimmer 1.4s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}

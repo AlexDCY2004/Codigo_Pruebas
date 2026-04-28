@@ -1,0 +1,140 @@
+.tratamientos-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.tratamientos-table thead {
+  background: #f8f9fa;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.tratamientos-table th {
+  padding: 1rem;
+  text-align: left;
+  font-weight: 600;
+  color: #1d3354;
+  white-space: nowrap;
+}
+
+.tratamientos-table tbody tr {
+  border-bottom: 1px solid #e9ecef;
+}
+
+.tratamientos-table tbody tr:hover {
+  background-color: #f8fbff;
+}
+
+.tratamientos-table td {
+  padding: 1rem;
+  color: #23324a;
+  vertical-align: top;
+}
+
+.tratamiento-area {
+  display: inline-flex;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  background: #eef4ff;
+  color: #2f5bea;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.tratamiento-descripcion {
+  max-width: 340px;
+  color: #52627a;
+}
+
+.tratamiento-form {
+  padding: 1.5rem;
+}
+
+.tratamiento-form--readonly {
+  padding-top: 1rem;
+}
+
+.tratamiento-read-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.tratamiento-read-label {
+  flex: 0 0 32%;
+  color: #1a2fd1;
+  font-weight: 700;
+}
+
+.tratamiento-read-value {
+  flex: 1;
+  color: #1f2937;
+  word-break: break-word;
+}
+
+.tratamiento-form--readonly .modal-footer {
+  justify-content: flex-end;
+  margin-top: 1rem;
+}
+
+.tratamiento-form .form-group {
+  margin-bottom: 1rem;
+}
+
+.tratamiento-form label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  color: #1d3354;
+}
+
+.tratamiento-form input,
+.tratamiento-form select {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #dce5f0;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  color: #23324a;
+  background: #fff;
+}
+
+.tratamiento-form input:focus,
+.tratamiento-form select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+}
+
+.tratamiento-form .input-error {
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.04);
+}
+
+@media (max-width: 1100px) {
+  .tratamientos-table {
+    font-size: 0.88rem;
+  }
+
+  .tratamientos-table th,
+  .tratamientos-table td {
+    padding: 0.75rem;
+  }
+
+  .tratamiento-descripcion {
+    max-width: 220px;
+  }
+
+  .tratamiento-read-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .tratamiento-read-label,
+  .tratamiento-read-value {
+    flex: 1;
+  }
+}

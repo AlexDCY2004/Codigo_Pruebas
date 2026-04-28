@@ -1,0 +1,104 @@
+.cm-modal-overlay{
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.45);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index:1200;
+}
+
+.cm-modal-content{
+  width:520px;
+  max-width:92%;
+  background:#fff;
+  border-radius:8px;
+  box-shadow:0 10px 30px rgba(0,0,0,0.2);
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+}
+
+.cm-modal-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:18px 20px;
+  background:transparent;
+}
+
+.cm-modal-title{
+  margin:0;
+  font-size:18px;
+  font-weight:600;
+  color:#222;
+}
+
+.cm-modal-close{
+  background:transparent;
+  border:0;
+  font-size:20px;
+  line-height:1;
+  cursor:pointer;
+  color:#666;
+}
+
+.cm-modal-body{
+  padding:12px 20px 16px 20px;
+}
+
+.cm-modal-message{
+  margin:0;
+  color:#2b2b2b;
+  font-size:15px;
+  line-height:1.45;
+  text-align:left;
+}
+
+.cm-modal-footer{
+  display:flex;
+  gap:12px;
+  justify-content:flex-end;
+  padding:14px 20px;
+  background:transparent; /* remove separator lines */
+}
+
+.cm-btn{
+  min-width:110px;
+  padding:8px 14px;
+  border-radius:6px;
+  border:1px solid rgba(0,0,0,0.08);
+  cursor:pointer;
+  font-size:14px;
+}
+
+.cm-btn:disabled{
+  opacity:0.6;
+  cursor:default;
+}
+
+/* Cancel: green */
+.cm-btn-cancel{
+  background:#28a745;
+  color:white;
+  border-color:#28a745;
+}
+
+/* Confirm/Delete: red */
+.cm-btn-confirm{
+  background:#dc3545;
+  color:white;
+  border-color:#dc3545;
+}
+
+@media (max-width:520px){
+  .cm-modal-content{ width:95%; }
+}
+
+/* actions inside modal body when footer is hidden */
+.cm-modal-actions{
+  display:flex;
+  gap:12px;
+  justify-content:flex-end;
+  margin-top:12px;
+}
