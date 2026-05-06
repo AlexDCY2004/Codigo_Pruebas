@@ -1,0 +1,313 @@
+.page-header--finance {
+  align-items: flex-start;
+}
+
+.finance-summary-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.8fr);
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.finance-filter-card,
+.finance-total-card {
+  border: 1px solid #dce5f0;
+  border-radius: 16px;
+  background: #fff;
+  padding: 1.5rem;
+}
+
+.finance-filter-card h3 {
+  margin: 0 0 1rem;
+  font-size: 1rem;
+  color: #1d3354;
+}
+
+.finance-date-input {
+  max-width: 100%;
+}
+
+.finance-total-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 130px;
+}
+
+.finance-total-card span {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #64748b;
+  margin-bottom: 1rem;
+}
+
+.finance-total-card strong {
+  font-size: 2.2rem;
+  line-height: 1;
+  color: #0f8a3b;
+}
+
+.finance-total-card--income {
+  border: 1px solid #777777;
+  background: #ecfbef;
+}
+
+.finance-total-card--income span {
+  color: #1d3354;
+}
+
+.finance-total-card--expense {
+  border: 1px solid #777777;
+  background: #fff1f1;
+}
+
+.finance-total-card--balance {
+  border: 1px solid #777777;
+}
+
+.finance-total-card--balance span {
+  color: #1d3354;
+}
+
+.finance-total-card--expense span,
+.finance-total-card--expense span {
+  color: #1d3354;
+}
+
+.finance-total-card--expense strong {
+  color: #d11a1a;
+}
+
+.search-container--finance {
+  margin-bottom: 1.5rem;
+}
+
+.ingresos-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.ingresos-table thead {
+  background: #f8f9fa;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.ingresos-table th,
+.ingresos-table td {
+  padding: 1rem;
+  text-align: left;
+  color: #23324a;
+}
+
+.ingresos-table tbody tr {
+  border-bottom: 1px solid #e9ecef;
+}
+
+.ingresos-table tbody tr:hover {
+  background: #f8fbff;
+}
+
+.finance-type-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.finance-type-badge--income {
+  background: #e9fbe9;
+  color: #0f8a3b;
+}
+
+.finance-type-badge--expense {
+  background: #ffe9e9;
+  color: #d11a1a;
+}
+
+.finance-amount {
+  font-weight: 700;
+  color: #0f8a3b;
+}
+
+.ingresos-table .finance-amount {
+  color: #0f8a3b;
+}
+
+.finance-amount--expense {
+  color: #d11a1a;
+}
+
+.finance-description {
+  max-width: 320px;
+  color: #52627a;
+}
+
+.egresos-table .finance-amount,
+.egresos-table .finance-amount--expense {
+  color: #d11a1a;
+}
+
+.finance-id-cell {
+  font-family: monospace;
+  font-size: 0.9rem;
+}
+
+.finance-form {
+  padding: 1.5rem;
+}
+
+.finance-form--readonly {
+  padding-top: 1rem;
+}
+
+.finance-read-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.finance-read-label {
+  flex: 0 0 32%;
+  color: #1a2fd1;
+  font-weight: 700;
+}
+
+.finance-read-value {
+  flex: 1;
+  color: #1f2937;
+  word-break: break-word;
+}
+
+.finance-form--readonly .modal-footer {
+  justify-content: flex-end;
+  margin-top: 1rem;
+}
+
+.finance-form .form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.finance-form .form-group {
+  margin-bottom: 1rem;
+}
+
+.finance-form label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  color: #1d3354;
+}
+
+.finance-form input {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #dce5f0;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  color: #23324a;
+}
+
+.finance-form input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+}
+
+@media (max-width: 1100px) {
+  .finance-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .finance-total-card strong {
+    font-size: 1.9rem;
+  }
+
+  .ingresos-table {
+    font-size: 0.88rem;
+  }
+
+  .ingresos-table th,
+  .ingresos-table td {
+    padding: 0.75rem;
+  }
+}
+
+@media (max-width: 720px) {
+  .finance-form .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .finance-description {
+    max-width: 220px;
+  }
+
+  .finance-read-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .finance-read-label,
+  .finance-read-value {
+    flex: 1;
+  }
+}
+
+/* Filters box for finance history */
+.finance-history-filters {
+  border: 1px solid #dce5f0;
+  border-radius: 12px;
+  background: #fff;
+  padding: 1rem;
+  margin: 1rem 0;
+}
+
+.finance-history-filters h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1d3354;
+}
+
+.finance-history-filters .filters-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.finance-history-filters .filters-row--search .search-container {
+  min-width: 0;
+}
+
+/* Keep date inputs compact inside the filters box */
+.finance-history-filters .finance-date-input {
+  max-width: 100%;
+}
+
+/* Make the two date inputs share available space while keeping the button fixed */
+.finance-history-filters .filters-row--date .search-input.finance-date-input {
+  flex: 1 1 0;
+  max-width: none;
+  min-width: 140px;
+}
+
+.finance-history-filters .filters-row--date span {
+  flex: 0 0 auto;
+}
+
+.finance-history-filters .filters-row--date .ui-btn {
+  flex: 0 0 auto;
+}
+
+.finance-history-filters .filters-row--date .search-input {
+  width: auto;
+}

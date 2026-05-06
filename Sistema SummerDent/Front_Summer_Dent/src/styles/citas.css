@@ -1,0 +1,599 @@
+/* ========== CITAS PAGE STYLES ========== */
+
+.citas-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.citas-table thead {
+  background: #f8f9fa;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.citas-table th {
+  padding: 0.875rem 0.75rem;
+  text-align: left;
+  font-weight: 600;
+  color: #666;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.citas-table tbody tr {
+  border-bottom: 1px solid #e0e0e0;
+  transition: background-color 0.2s;
+}
+
+.citas-table tbody tr:hover {
+  background-color: #f8f9fa;
+}
+
+.citas-table td {
+  padding: 0.875rem 0.75rem;
+  color: #333;
+}
+
+.citas-table td strong {
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.cita-tratamientos-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.22rem;
+}
+
+.cita-tratamiento-item {
+  display: block;
+  line-height: 1.25;
+}
+
+/* ========== STATE BADGES ========== */
+
+.badge {
+  display: inline-block;
+  padding: 0.35rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+
+.badge-confirmed {
+  background-color: rgba(124, 179, 66, 0.15);
+  color: #7cb342;
+}
+
+.badge-pending {
+  background-color: rgba(251, 188, 5, 0.15);
+  color: #fbc405;
+}
+
+.badge-attended {
+  background-color: rgba(66, 183, 245, 0.15);
+  color: #42b7f5;
+}
+
+.badge-cancelled {
+  background-color: rgba(211, 47, 47, 0.15);
+  color: #d32f2f;
+}
+
+.badge-default {
+  background-color: rgba(158, 158, 158, 0.15);
+  color: #9e9e9e;
+}
+
+/* ========== FORM STYLES ========== */
+
+.cita-form {
+  padding: 1.5rem;
+}
+
+.cita-form .form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.cita-form .form-row:nth-child(2) {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+.cita-form .form-row:nth-child(3) {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+.cita-form .form-group {
+  margin-bottom: 0;
+}
+
+.cita-form label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  color: #333;
+  font-size: 0.9rem;
+}
+
+.cita-form input,
+.cita-form select {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  font-size: 0.95rem;
+  font-family: inherit;
+  transition: border-color 0.2s;
+}
+
+.cita-form input:focus,
+.cita-form select:focus {
+  outline: none;
+  border-color: #1976d2;
+  box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.1);
+}
+
+.cita-form input.input-error,
+.cita-form select.input-error {
+  border-color: #d32f2f;
+  background-color: rgba(211, 47, 47, 0.05);
+}
+
+.error-text {
+  display: block;
+  color: #d32f2f;
+  font-size: 0.8rem;
+  margin-top: 0.25rem;
+}
+
+/* ========== MODAL SIZE ========== */
+
+.modal-content--large {
+  max-width: 680px;
+  width: 80%;
+}
+
+/* Ensure modals appear above all other UI elements */
+.modal-overlay {
+  z-index: 99999 !important;
+}
+.modal-content {
+  z-index: 100000 !important;
+  position: relative;
+  max-width: 560px;
+  width: 80%;
+}
+
+/* ========== RESPONSIVE ========== */
+
+@media (max-width: 1200px) {
+  .citas-table {
+    font-size: 0.85rem;
+  }
+
+  .citas-table th,
+  .citas-table td {
+    padding: 0.75rem 0.5rem;
+  }
+
+  .cita-form .form-row:nth-child(2),
+  .cita-form .form-row:nth-child(3) {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .citas-table {
+    font-size: 0.8rem;
+  }
+
+  .citas-table th,
+  .citas-table td {
+    padding: 0.5rem 0.25rem;
+  }
+
+  .cita-form .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .table-actions {
+    gap: 0.25rem;
+  }
+
+  .action-btn {
+    width: 20px;
+    height: 28px;
+  }
+
+  .modal-content {
+    width: 95%;
+  }
+
+  /* Make modal sit closer to top of viewport for quicker visibility */
+  .modal-overlay {
+    align-items: flex-start;
+    padding-top: 1.5rem;
+  }
+
+  /* Slightly reduce padding inside modal to make it more compact */
+  .modal-content .modal-header {
+    padding: 1rem;
+  }
+  .cita-form {
+    padding: 1rem;
+  }
+  .modal-footer {
+    padding: 0.75rem 1rem;
+  }
+}
+
+/* Read-only field row (label / value) */
+.field-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid #f7f7f7;
+}
+
+.field-label {
+  font-weight: bold;
+  color: blue;
+  flex: 0 0 30%;
+  text-align: left;
+}
+
+.field-value {
+  color: black;
+  text-align: left;
+  flex: 1 1 70%;
+  padding-left: 5rem;
+  word-break: break-word;
+}
+
+.field-readonly {
+  padding: 0.25rem 0;
+}
+
+.searchable-list {
+  margin-top: 0.5rem;
+  margin-bottom: 0.75rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  max-height: 190px;
+  overflow-y: auto;
+  background: #fff;
+}
+
+.searchable-list--checkbox {
+  max-height: 220px;
+}
+
+.searchable-option {
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid #f0f0f0;
+  background: #fff;
+  text-align: left;
+  padding: 0.65rem 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  cursor: pointer;
+}
+
+.searchable-option:last-child {
+  border-bottom: none;
+}
+
+.searchable-option:hover {
+  background: #f8fbff;
+}
+
+.searchable-option.is-selected {
+  background: #eaf2ff;
+}
+
+.searchable-option small {
+  color: #64748b;
+}
+
+.searchable-option-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.searchable-empty {
+  padding: 0.7rem 0.75rem;
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+.searchable-combobox {
+  position: relative;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.searchable-combobox--button {
+  width: 100%;
+  min-height: 48px;
+  padding: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.searchable-combobox input {
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.searchable-combobox__value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #23324a;
+}
+
+.searchable-combobox__value.is-placeholder {
+  color: #8a97a8;
+}
+
+.searchable-combobox__icon {
+  flex-shrink: 0;
+  color: #64748b;
+  font-size: 0.85rem;
+}
+
+.searchable-combobox:focus-within {
+  border-color: #1976d2;
+  box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.1);
+}
+
+.searchable-combobox.input-error {
+  border-color: #d32f2f;
+  background-color: rgba(211, 47, 47, 0.05);
+}
+
+.searchable-combobox-list {
+  border-top: 1px solid #edf0f5;
+  max-height: 170px;
+  overflow-y: auto;
+}
+
+.searchable-combobox-list--checkbox {
+  max-height: 220px;
+}
+
+.modal-overlay--nested {
+  z-index: 100001 !important;
+}
+
+.modal-content--selector {
+  max-width: 1100px;
+  width: 92%;
+}
+
+.tratamientos-selector-modal {
+  padding: 1.25rem 1.5rem 1.5rem;
+}
+
+.tratamientos-selector-search {
+  margin-bottom: 1rem;
+}
+
+.tratamientos-selector-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  max-height: 58vh;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.tratamientos-selector-group {
+  border: 1px solid #dce5f0;
+  border-radius: 14px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.tratamientos-selector-group__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.9rem 1rem;
+  background: linear-gradient(180deg, #f8fbff 0%, #f2f7ff 100%);
+  border-bottom: 1px solid #e5edf7;
+}
+
+.tratamientos-selector-group__header h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: #1d3354;
+}
+
+.tratamientos-selector-group__header span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  background: #e8f0ff;
+  color: #2f5bea;
+  font-weight: 700;
+  font-size: 0.82rem;
+}
+
+.tratamientos-selector-list {
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.tratamientos-selector-item {
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid #eef2f7;
+  background: #fff;
+  padding: 0.85rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tratamientos-selector-item:last-child {
+  border-bottom: none;
+}
+
+.tratamientos-selector-item:hover {
+  background: #f8fbff;
+}
+
+.tratamientos-selector-item.is-selected {
+  background: #eaf2ff;
+}
+
+.tratamientos-selector-item__main {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  min-width: 0;
+}
+
+.tratamientos-selector-item__main strong {
+  display: block;
+  color: #1f2937;
+  font-size: 0.95rem;
+}
+
+.tratamientos-selector-item__main p {
+  margin: 0.2rem 0 0;
+  color: #64748b;
+  font-size: 0.84rem;
+}
+
+.tratamientos-selector-item__price {
+  flex-shrink: 0;
+  font-weight: 700;
+  color: #0f8a3b;
+  white-space: nowrap;
+}
+
+.tratamientos-selector-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.tratamientos-selector-summary {
+  color: #52627a;
+  font-size: 0.95rem;
+}
+
+.tratamientos-selector-empty {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+@media (max-width: 1100px) {
+  .citas-table {
+    font-size: 0.85rem;
+  }
+
+  .citas-table th,
+  .citas-table td {
+    padding: 0.75rem 0.5rem;
+  }
+
+  .cita-form .form-row:nth-child(2),
+  .cita-form .form-row:nth-child(3) {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .tratamientos-selector-grid {
+    grid-template-columns: 1fr;
+    max-height: 62vh;
+  }
+
+  .tratamientos-selector-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+@media (max-width: 720px) {
+  .citas-table {
+    font-size: 0.8rem;
+  }
+
+  .citas-table th,
+  .citas-table td {
+    padding: 0.5rem 0.25rem;
+  }
+
+  .cita-form .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .table-actions {
+    gap: 0.25rem;
+  }
+
+  .action-btn {
+    width: 20px;
+    height: 28px;
+  }
+
+  .modal-content {
+    width: 95%;
+  }
+
+  .modal-overlay {
+    align-items: flex-start;
+    padding-top: 1.5rem;
+  }
+
+  .modal-content .modal-header {
+    padding: 1rem;
+  }
+
+  .cita-form {
+    padding: 1rem;
+  }
+
+  .modal-footer {
+    padding: 0.75rem 1rem;
+  }
+
+  .modal-content--selector {
+    width: 95%;
+  }
+
+  .tratamientos-selector-modal {
+    padding: 1rem;
+  }
+}

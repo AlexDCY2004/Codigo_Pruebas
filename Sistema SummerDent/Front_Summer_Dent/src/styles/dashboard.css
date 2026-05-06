@@ -1,0 +1,268 @@
+.dashboard-grid {
+  display: grid;
+  gap: 1.35rem;
+}
+
+.dashboard-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.dashboard-title h1 {
+  margin: 0;
+  font-size: 1.6rem;/**/
+  color: #162b49;
+  font-weight: 700;
+}
+
+.dashboard-title p {
+  margin-top: 0.35rem;
+  color: #2e2d2d;
+  font-size: 0.9rem;/**/
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.stat-card {
+  border: 1px solid #777777;
+  border-radius: 14px;
+  background: #f8fafd;
+  padding: 1.3rem 1.4rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.stat-card__title {
+  margin: 0;
+  color: #2e2d2d;
+  font-size: 0.88rem;/**/
+}
+
+.stat-card__value {
+  margin: 0.55rem 0 0;
+  color: #162b49;
+  font-size: 1.5rem;/**/
+  font-weight: 800;
+  line-height: 1;
+}
+
+.stat-card__icon {
+  width: 58px;
+  height: 58px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+}
+
+.stat-card__icon--citas-hoy {
+  background: #e6eefc;
+  color: #2f73e8;
+}
+
+.stat-card__icon--total-ingresos {
+  background: #e5f5ec;
+  color: #1ca655;
+}
+
+.stat-card__icon--total-egresos,
+.stat-card__icon--balance {
+  background: #faecee;
+  color: #e11616;
+}
+
+.quick-access h2 {
+  margin: 0;
+  font-size: 1.3rem;/**/
+  color: #162b49;
+}
+
+.quick-access__buttons {
+  margin-top: 0.95rem;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.quick-btn {
+  border: none;
+  border-radius: 10px;
+  height: 44px;
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.85rem;/**/
+  cursor: pointer;
+}
+
+.quick-btn--1 {
+  background: #3a7ce5;
+}
+
+.quick-btn--2 {
+  background: #0cc752;
+}
+
+.quick-btn--3 {
+  background: linear-gradient(90deg, #9b45ec 0%, #b445f6 100%);
+}
+
+.quick-btn--4 {
+  background: #ff6a00;
+}
+
+.dashboard-panels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.panel-card {
+  border: 1px solid #777777;
+  border-radius: 14px;
+  padding: 1.3rem;
+  background: #fbfcfe;
+}
+
+.panel-card h3 {
+  margin: 0;
+  color: #162b49;
+  font-size: 1.3rem;/**/
+}
+
+.appointments-list {
+  margin-top: 1rem;
+  display: grid;
+  gap: 0.8rem;
+}
+
+.dashboard-empty {
+  margin: 0;
+  color: #647b9b;
+  font-size: 0.85rem;/**/
+}
+
+.appointment-item {
+  border-radius: 10px;
+  background: #edf1f7;
+  padding: 0.9rem 0.9rem;
+  display: flex;
+  justify-content: space-between;
+  gap: 0.7rem;
+  align-items: center;
+}
+
+.appointment-id {
+  margin: 0;
+  color: #2d3f5d;
+  font-size: 0.8rem;/**/
+}
+
+.appointment-item span {
+  color: #647b9b;
+  font-size: 0.85rem;/**/
+}
+
+.appointment-status {
+  border-radius: 8px;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.82rem;/**/
+  font-weight: 600;
+}
+
+.appointment-status--ok {
+  background: #cdefd9;
+  color: #2b8f57;
+}
+
+.appointment-status--pending {
+  background: #efe59f;
+  color: #997d20;
+}
+
+.appointment-item .appointment-status--today {
+  background: #f2dc4f;
+  color: #23324a;
+}
+
+.finance-list {
+  margin-top: 1rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.finance-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-radius: 10px;
+  padding: 0.95rem 1rem;
+}
+
+.finance-item span {
+  color: #2f4562;
+  font-size: 0.92rem;/**/
+}
+
+.finance-item strong {
+  font-size: 1rem;/**/
+}
+
+.finance-item--income {
+  background: #dfefe8;
+}
+
+.finance-item--income strong {
+  color: #1e9b4f;
+}
+
+.finance-item--expense {
+  background: #f6e9ea;
+}
+
+.finance-item--expense strong {
+  color: #d32e2e;
+}
+
+@media (max-width: 1200px) {
+  .summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .quick-access__buttons {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-panels {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .dashboard-title h1 {
+    font-size: 1.45rem;/**/
+  }
+
+  .quick-access h2,
+  .panel-card h3 {
+    font-size: 1.2rem;/**/
+  }
+
+  .summary-grid,
+  .quick-access__buttons {
+    grid-template-columns: 1fr;
+  }
+
+  .stat-card__value {
+    font-size: 1.6rem;/**/
+  }
+
+  .appointment-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
