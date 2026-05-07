@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { sanitizeText } from '../../utils/sanitize';
 import ConfirmModal from '../../components/ui/ConfirmModal';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchCitas, createCita, updateCita, deleteCita } from '../../services/api/citas';
@@ -207,7 +208,7 @@ export default function CitasPage() {
             className="search-input"
             placeholder="Buscar por paciente, odontólogo o estado..."
             value={searchTerm}
-            onChange={(event) => setSearchTerm(event.target.value)}
+            onChange={(event) => setSearchTerm(sanitizeText(event.target.value, 100))}
             style={{ paddingRight: '1rem' }}
           />
         </div>

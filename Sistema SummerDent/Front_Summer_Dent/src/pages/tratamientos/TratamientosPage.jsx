@@ -1,4 +1,5 @@
 import { useMemo, useState, useRef } from 'react';
+import { sanitizeText } from '../../utils/sanitize';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   createTratamiento,
@@ -196,7 +197,7 @@ export default function TratamientosPage() {
           className="search-input"
           placeholder="Buscar por área, nombre, precio o descripción..."
           value={searchTerm}
-          onChange={(event) => setSearchTerm(event.target.value)}
+          onChange={(event) => setSearchTerm(sanitizeText(event.target.value, 100))}
         />
       </div>
 

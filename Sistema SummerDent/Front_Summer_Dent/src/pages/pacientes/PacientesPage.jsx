@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
+import { sanitizeText } from '../../utils/sanitize';
 import ConfirmModal from '../../components/ui/ConfirmModal';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchPacientes, createPaciente, updatePaciente, deletePaciente } from '../../services/api/pacientes';
@@ -181,7 +182,7 @@ export default function PacientesPage() {
           className="search-input"
           placeholder="Buscar por nombre o cédula..."
           value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          onChange={(e) => setSearchTerm(sanitizeText(e.target.value, 100))}
         />
       </div>
 

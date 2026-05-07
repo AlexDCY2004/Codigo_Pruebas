@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { sanitizeText, sanitizeDecimal } from '../../utils/sanitize';
 
 const AREAS_PERMITIDAS = [
   'Ortodoncia General',
@@ -120,9 +121,24 @@ export default function TratamientoModal({
   const handleChange = (event) => {
     const { name, value } = event.target;
 
+    let sanitized = value;
+    switch (name) {
+      case 'nombre':
+        sanitized = sanitizeText(value, 64);
+        break;
+      case 'descripcion':
+        sanitized = sanitizeText(value, 300);
+        break;
+      case 'precio':
+        sanitized = sanitizeDecimal(value);
+        break;
+      default:
+        break;
+    }
+
     setFormData((prev) => ({
       ...prev,
-      [name]: value
+      [name]: sanitized
     }));
 
     if (errors[name]) {

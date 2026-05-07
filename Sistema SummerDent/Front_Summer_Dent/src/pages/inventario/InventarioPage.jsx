@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { sanitizeText, sanitizeDigits } from '../../utils/sanitize';
 import ConfirmModal from '../../components/ui/ConfirmModal';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchProductos, updateProducto, createProducto } from '../../services/api/productos';
@@ -339,7 +340,7 @@ export default function InventarioPage() {
             className="search-input"
             placeholder="Buscar por producto, stock o perfil..."
             value={searchTerm}
-            onChange={(event) => setSearchTerm(event.target.value)}
+            onChange={(event) => setSearchTerm(sanitizeText(event.target.value, 100))}
           />
         </div>
 
@@ -509,7 +510,7 @@ export default function InventarioPage() {
               type="number"
               min="1"
               value={pendingMovementQty}
-              onChange={(e) => setPendingMovementQty(e.target.value)}
+              onChange={(e) => setPendingMovementQty(sanitizeDigits(e.target.value, 6))}
               style={{ width: '6rem', padding: '0.25rem' }}
             />
           </label>
@@ -538,7 +539,7 @@ export default function InventarioPage() {
 
                 <div className="form-group">
                   <label htmlFor="mov_detalle_pago">Detalle</label>
-                  <textarea id="mov_detalle_pago" rows={3} value={movementDetallePago} onChange={(e) => setMovementDetallePago(e.target.value)} placeholder="Descripción breve del pago (opcional)" style={{ width: '100%', padding: '0.5rem' }} />
+                  <textarea id="mov_detalle_pago" rows={3} value={movementDetallePago} onChange={(e) => setMovementDetallePago(sanitizeText(e.target.value, 300))} placeholder="Descripción breve del pago (opcional)" style={{ width: '100%', padding: '0.5rem' }} maxLength={300} />
                 </div>
               </div>
             </div>

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { sanitizeText, sanitizeDecimal } from '../../utils/sanitize';
 
 const normalizeText = (value) => String(value || '').trim().toLowerCase();
 
@@ -355,7 +356,7 @@ export default function CitaModal({ isOpen, onClose, onSubmit, initialData, isLo
                       onFocus={() => setIsPacienteOpen(true)}
                       onBlur={() => setTimeout(() => setIsPacienteOpen(false), 120)}
                       onChange={(event) => {
-                        setPacienteQuery(event.target.value);
+                        setPacienteQuery(sanitizeText(event.target.value, 100));
                         setIsPacienteOpen(true);
                       }}
                       onKeyDown={(event) => {
@@ -398,7 +399,7 @@ export default function CitaModal({ isOpen, onClose, onSubmit, initialData, isLo
                       onFocus={() => setIsDoctorOpen(true)}
                       onBlur={() => setTimeout(() => setIsDoctorOpen(false), 120)}
                       onChange={(event) => {
-                        setDoctorQuery(event.target.value);
+                        setDoctorQuery(sanitizeText(event.target.value, 100));
                         setIsDoctorOpen(true);
                       }}
                       onKeyDown={(event) => {
@@ -516,7 +517,7 @@ export default function CitaModal({ isOpen, onClose, onSubmit, initialData, isLo
                     min="0"
                     placeholder="0.00"
                     onChange={(e) => {
-                      const v = e.target.value;
+                      const v = sanitizeDecimal(e.target.value);
                       // marcar como editado sólo si el usuario dejó un valor no vacío
                       setIsPrecioEdited(String(v).trim() !== '');
                       setFormData((prev) => ({ ...prev, precio: v }));
@@ -555,7 +556,7 @@ export default function CitaModal({ isOpen, onClose, onSubmit, initialData, isLo
 
                         <div className="form-group">
                           <label htmlFor="detalle_pago">Detalle</label>
-                          <textarea id="detalle_pago" rows={3} value={paymentDetail} onChange={(e) => setPaymentDetail(e.target.value)} placeholder="Descripción breve del pago (opcional)" style={{ width: '100%', padding: '0.5rem' }} />
+                          <textarea id="detalle_pago" rows={3} value={paymentDetail} onChange={(e) => setPaymentDetail(sanitizeText(e.target.value, 300))} placeholder="Descripción breve del pago (opcional)" style={{ width: '100%', padding: '0.5rem' }} maxLength={300} />
                         </div>
 
                         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
@@ -609,7 +610,7 @@ export default function CitaModal({ isOpen, onClose, onSubmit, initialData, isLo
                     className="search-input"
                     placeholder="Buscar por nombre, área o descripción..."
                     value={tratamientoSelectorSearch}
-                    onChange={(event) => setTratamientoSelectorSearch(event.target.value)}
+                    onChange={(event) => setTratamientoSelectorSearch(sanitizeText(event.target.value, 100))}
                   />
                 </div>
 

@@ -11,6 +11,7 @@ import {
 } from '../../services/api/movimientoFinanzas';
 import { fetchDoctores } from '../../services/api/doctores';
 import ErrorState from '../../components/feedback/ErrorState';
+import { sanitizeText, sanitizeDecimal } from '../../utils/sanitize';
 
 const initialFormState = {
   id_doctor: '',
@@ -233,9 +234,22 @@ export default function EgresosPage() {
 
   const handleFormChange = (event) => {
     const { name, value } = event.target;
+
+    let sanitized = value;
+    switch (name) {
+      case 'monto':
+        sanitized = sanitizeDecimal(value);
+        break;
+      case 'descripcion':
+        sanitized = sanitizeText(value, 300);
+        break;
+      default:
+        break;
+    }
+
     setFormData((prev) => ({
       ...prev,
-      [name]: value
+      [name]: sanitized
     }));
 
     if (formErrors[name]) {
@@ -347,7 +361,7 @@ export default function EgresosPage() {
           className="search-input"
           placeholder="Buscar por fecha, doctor, monto, descripción o perfil..."
           value={searchTerm}
-          onChange={(event) => setSearchTerm(event.target.value)}
+          onChange={(event) => setSearchTerm(sanitizeText(event.target.value, 100))}
         />
       </div>
 

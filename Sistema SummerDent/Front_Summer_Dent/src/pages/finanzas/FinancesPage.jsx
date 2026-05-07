@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { sanitizeText } from '../../utils/sanitize';
 import { useQuery } from '@tanstack/react-query';
 import { fetchMovimientosFinanzas } from '../../services/api/movimientoFinanzas';
 import ErrorState from '../../components/feedback/ErrorState';
@@ -347,7 +348,7 @@ export default function FinancesPage() {
                 className="search-input"
                 placeholder="Buscar movimiento..."
                 value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
+                onChange={(event) => setSearchTerm(sanitizeText(event.target.value, 100))}
               />
             </div>
 

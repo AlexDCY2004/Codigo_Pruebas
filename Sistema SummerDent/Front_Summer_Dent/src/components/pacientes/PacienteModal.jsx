@@ -1,4 +1,15 @@
 import { useState, useEffect } from 'react';
+import {
+  sanitizeCedula,
+  sanitizeAlpha,
+  sanitizePhone,
+  sanitizeEmail,
+  sanitizeAddress,
+  validarCedulaEcuatoriana,
+  validarEmail,
+  validarLongitud,
+  validarFechaNoFutura
+} from '../../utils/sanitize';
 
 const getInitialFormData = (initialData) => ({
   id_cedula: initialData?.id_cedula || '',
@@ -40,10 +51,45 @@ export default function PacienteModal({ isOpen, onClose, onSubmit, initialData, 
   const validateForm = () => {
     const newErrors = {};
     
-    if (!formData.id_cedula?.trim()) newErrors.id_cedula = 'Cédula requerida';
+    // Cédula: validación ecuatoriana completa
+    const cedulaError = validarCedulaEcuatoriana(formData.id_cedula);
+    if (cedulaError) newErrors.id_cedula = cedulaError;
+
+    // Nombre
+    const nombreError = validarLongitud(formData.nombre, 2, 50, 'El nombre');
     if (!formData.nombre?.trim()) newErrors.nombre = 'Nombre requerido';
+    else if (nombreError) newErrors.nombre = nombreError;
+
+    // Apellido
+    const apellidoError = validarLongitud(formData.apellido, 2, 50, 'El apellido');
     if (!formData.apellido?.trim()) newErrors.apellido = 'Apellido requerido';
-    if (!formData.fecha_nacimiento) newErrors.fecha_nacimiento = 'Fecha de nacimiento requerida';
+    else if (apellidoError) newErrors.apellido = apellidoError;
+
+    // Fecha de nacimiento
+    if (!formData.fecha_nacimiento) {
+      newErrors.fecha_nacimiento = 'Fecha de nacimiento requerida';
+    } else {
+      const fechaError = validarFechaNoFutura(formData.fecha_nacimiento);
+      if (fechaError) newErrors.fecha_nacimiento = fechaError;
+    }
+
+    // Teléfono (opcional, pero si se ingresa debe ser 10 dígitos)
+    if (formData.telefono?.trim()) {
+      if (!/^\d{10}$/.test(formData.telefono.trim())) {
+        newErrors.telefono = 'El teléfono debe tener exactamente 10 dígitos';
+      }
+    }
+
+    // Correo (opcional, pero si se ingresa debe ser válido)
+    if (formData.correo?.trim()) {
+      const correoError = validarEmail(formData.correo);
+      if (correoError) newErrors.correo = correoError;
+    }
+
+    // Dirección (opcional, solo limitar longitud)
+    if (formData.direccion && formData.direccion.length > 255) {
+      newErrors.direccion = 'La dirección no puede superar 255 caracteres';
+    }
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -52,9 +98,32 @@ export default function PacienteModal({ isOpen, onClose, onSubmit, initialData, 
   const handleChange = (e) => {
     if (readOnly) return;
     const { name, value } = e.target;
+
+    let sanitized = value;
+    switch (name) {
+      case 'id_cedula':
+        sanitized = sanitizeCedula(value);
+        break;
+      case 'nombre':
+      case 'apellido':
+        sanitized = sanitizeAlpha(value, 50);
+        break;
+      case 'telefono':
+        sanitized = sanitizePhone(value);
+        break;
+      case 'correo':
+        sanitized = sanitizeEmail(value, 100);
+        break;
+      case 'direccion':
+        sanitized = sanitizeAddress(value, 255);
+        break;
+      default:
+        break;
+    }
+
     setFormData(prev => ({
       ...prev,
-      [name]: value
+      [name]: sanitized
     }));
     if (errors[name]) {
       setErrors(prev => ({

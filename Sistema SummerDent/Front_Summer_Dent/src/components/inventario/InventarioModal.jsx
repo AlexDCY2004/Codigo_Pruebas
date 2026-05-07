@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { sanitizeText, sanitizeDecimal, sanitizeDigits } from '../../utils/sanitize';
 
 export default function InventarioModal({
   isOpen,
@@ -91,7 +92,33 @@ export default function InventarioModal({
   };
 
   const handleChange = (event) => {
-    const { name } = event.target;
+    const { name, value } = event.target;
+
+    let sanitized = value;
+    switch (name) {
+      case 'nombre':
+        sanitized = sanitizeText(value, 100);
+        break;
+      case 'descripcion':
+        sanitized = sanitizeText(value, 300);
+        break;
+      case 'categoria':
+        sanitized = sanitizeText(value, 100);
+        break;
+      case 'precio':
+        sanitized = sanitizeDecimal(value);
+        break;
+      case 'stock_producto':
+      case 'stock_minimo':
+      case 'cantidad':
+        sanitized = sanitizeDigits(value, 6);
+        break;
+      default:
+        break;
+    }
+
+    // For uncontrolled inputs using defaultValue, we need to update the DOM directly
+    event.target.value = sanitized;
 
     if (errors[name]) {
       setErrors((prev) => ({

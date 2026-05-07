@@ -12,6 +12,7 @@ import {
 import { fetchDoctores } from '../../services/api/doctores';
 import { fetchCitas } from '../../services/api/citas';
 import ErrorState from '../../components/feedback/ErrorState';
+import { sanitizeText, sanitizeDecimal } from '../../utils/sanitize';
 
 const initialFormState = {
   id_doctor: '',
@@ -277,9 +278,21 @@ export default function IngresosPage() {
   const handleFormChange = (event) => {
     const { name, value } = event.target;
 
+    let sanitized = value;
+    switch (name) {
+      case 'monto':
+        sanitized = sanitizeDecimal(value);
+        break;
+      case 'descripcion':
+        sanitized = sanitizeText(value, 300);
+        break;
+      default:
+        break;
+    }
+
     setFormData((prev) => ({
       ...prev,
-      [name]: value
+      [name]: sanitized
     }));
 
     if (formErrors[name]) {
@@ -392,7 +405,7 @@ export default function IngresosPage() {
           className="search-input"
           placeholder="Buscar por fecha, doctor, monto o descripción..."
           value={searchTerm}
-          onChange={(event) => setSearchTerm(event.target.value)}
+          onChange={(event) => setSearchTerm(sanitizeText(event.target.value, 100))}
         />
       </div>
 

@@ -1,4 +1,12 @@
 import { useEffect, useState } from 'react';
+import {
+  sanitizeText,
+  sanitizePhone,
+  sanitizeEmail,
+  sanitizeAlpha,
+  validarEmail,
+  validarLongitud
+} from '../../utils/sanitize';
 
 const initialFormState = {
   nombre: '',
@@ -63,6 +71,9 @@ export default function DoctorModal({ isOpen, onClose, onSubmit, initialData, is
 
     if (!formData.nombre.trim()) {
       nextErrors.nombre = 'El nombre es obligatorio';
+    } else {
+      const nombreError = validarLongitud(formData.nombre, 2, 100, 'El nombre');
+      if (nombreError) nextErrors.nombre = nombreError;
     }
 
     if (!formData.telefono.trim()) {
@@ -75,6 +86,9 @@ export default function DoctorModal({ isOpen, onClose, onSubmit, initialData, is
 
     if (!formData.correo.trim()) {
       nextErrors.correo = 'El correo es obligatorio';
+    } else {
+      const correoError = validarEmail(formData.correo);
+      if (correoError) nextErrors.correo = correoError;
     }
 
     if (!formData.especialidad.trim()) {
@@ -90,9 +104,27 @@ export default function DoctorModal({ isOpen, onClose, onSubmit, initialData, is
   const handleChange = (event) => {
     const { name, value } = event.target;
 
+    let sanitized = value;
+    switch (name) {
+      case 'nombre':
+        sanitized = sanitizeText(value, 100);
+        break;
+      case 'telefono':
+        sanitized = sanitizePhone(value);
+        break;
+      case 'correo':
+        sanitized = sanitizeEmail(value, 100);
+        break;
+      case 'especialidad':
+        sanitized = sanitizeAlpha(value, 100);
+        break;
+      default:
+        break;
+    }
+
     setFormData((prev) => ({
       ...prev,
-      [name]: value
+      [name]: sanitized
     }));
 
     if (errors[name]) {
