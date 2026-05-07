@@ -18,7 +18,7 @@ const initialFormState = {
   id_doctor: '',
   monto: '',
   descripcion: '',
-  metodo_pago: '',
+  metodo_pago: 'efectivo',
   fecha: ''
 };
 
