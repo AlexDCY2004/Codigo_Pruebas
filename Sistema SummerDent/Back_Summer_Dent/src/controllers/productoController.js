@@ -2,6 +2,8 @@ import { getSupabaseClientWithToken } from '../configuracionesDB/supabaseClient.
 
 const precioRegex = /^\d+(?:\.\d{1,2})?$/; // permite decimales con hasta 2 cifras
 const stockRegex = /^\d+$/;
+// Nombre permite letras (incluyendo acentuadas), números, espacios, guión, guión bajo y slash
+const nombreRegex = /^[A-Za-z0-9\u00C0-\u017F\s\-_\/]+$/;
 
 const esPrecioValido = (precio) => {
     if (precio === undefined || precio === null || precio === '') return true;
@@ -21,8 +23,15 @@ export const crearProductoController = async (req, res) => {
 
         const { nombre, descripcion, categoria, stock_producto, stock_minimo, precio } = req.body;
 
+        // Todos los campos obligatorios
         if (!nombre || !String(nombre).trim()) return res.status(400).json({ error: 'El nombre del producto es obligatorio' });
+        if (!nombreRegex.test(String(nombre).trim())) return res.status(400).json({ error: "El nombre contiene caracteres no permitidos" });
+        if (!descripcion || !String(descripcion).trim()) return res.status(400).json({ error: 'La descripción es obligatoria' });
+        if (!categoria || !String(categoria).trim()) return res.status(400).json({ error: 'La categoría es obligatoria' });
+        if (precio === undefined || precio === null || String(precio).trim() === '') return res.status(400).json({ error: 'El precio es obligatorio' });
         if (!esPrecioValido(precio)) return res.status(400).json({ error: 'precio inválido (usa formato 0 o 0.00)' });
+        if (stock_producto === undefined || stock_producto === null || String(stock_producto).trim() === '') return res.status(400).json({ error: 'stock_producto es obligatorio' });
+        if (stock_minimo === undefined || stock_minimo === null || String(stock_minimo).trim() === '') return res.status(400).json({ error: 'stock_minimo es obligatorio' });
         if (!esStockSoloNumeros(stock_producto)) return res.status(400).json({ error: 'stock_producto debe contener solo numeros' });
         if (!esStockSoloNumeros(stock_minimo)) return res.status(400).json({ error: 'stock_minimo debe contener solo numeros' });
 
@@ -67,13 +76,16 @@ export const crearProductoController = async (req, res) => {
         }
 
         // 2) Crear inventario asociado (siempre se crea aunque stocks no se envíen: usa defaults)
+        const now = new Date();
+        const todayLocal = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
         const inventarioPayload = {
             id_producto: productoData.id,
             id_perfil: perfilId,
             stock_producto: parsedStock !== null ? Math.floor(parsedStock) : 0,
             stock_minimo: parsedMin !== null ? Math.floor(parsedMin) : 0,
             precio: productoData.precio !== null && productoData.precio !== undefined ? Number(productoData.precio).toFixed(2) : '0.00',
-            fecha_actualizacion: new Date().toISOString().slice(0, 10) // YYYY-MM-DD
+            fecha_actualizacion: todayLocal
         };
 
         const { data: invData, error: invError } = await supabaseUser.from('inventario').insert([inventarioPayload]).select().maybeSingle();
@@ -92,7 +104,7 @@ export const crearProductoController = async (req, res) => {
 
 export const obtenerProductosController = async (_req, res) => {
     try {
-        const token = ( (_req && _req.headers && _req.headers.authorization) || '' ).startsWith('Bearer ') ? ((_req.headers.authorization || '').replace('Bearer ', '').trim()) : null;
+        const token = ((_req && _req.headers && _req.headers.authorization) || '').startsWith('Bearer ') ? ((_req.headers.authorization || '').replace('Bearer ', '').trim()) : null;
         if (!token) return res.status(401).json({ error: 'Token no proporcionado' });
         const supabaseUser = getSupabaseClientWithToken(token);
 
@@ -133,7 +145,15 @@ export const actualizarProductoController = async (req, res) => {
         if (fetchErr) return res.status(500).json({ error: fetchErr.message || fetchErr });
         if (!existing) return res.status(404).json({ error: 'Producto no encontrado' });
 
-        if (nombre !== undefined && !String(nombre).trim()) return res.status(400).json({ error: 'El nombre del producto no puede estar vacío' });
+        // Para actualización requerimos todos los campos (evitamos updates parciales)
+        if (nombre === undefined || descripcion === undefined || categoria === undefined || precio === undefined || stock_producto === undefined || stock_minimo === undefined) {
+            return res.status(400).json({ error: 'Todos los campos son obligatorios para actualizar el producto' });
+        }
+
+        if (!String(nombre).trim()) return res.status(400).json({ error: 'El nombre del producto no puede estar vacío' });
+        if (!nombreRegex.test(String(nombre).trim())) return res.status(400).json({ error: 'El nombre contiene caracteres no permitidos' });
+        if (!String(descripcion).trim()) return res.status(400).json({ error: 'La descripción no puede estar vacía' });
+        if (!String(categoria).trim()) return res.status(400).json({ error: 'La categoría no puede estar vacía' });
         if (!esPrecioValido(precio)) return res.status(400).json({ error: 'precio inválido (usa formato 0 o 0.00)' });
         if (!esStockSoloNumeros(stock_producto)) return res.status(400).json({ error: 'stock_producto debe contener solo numeros' });
         if (!esStockSoloNumeros(stock_minimo)) return res.status(400).json({ error: 'stock_minimo debe contener solo numeros' });
@@ -154,7 +174,8 @@ export const actualizarProductoController = async (req, res) => {
             updates.precio = parsedPrecio !== null ? parsedPrecio.toFixed(2) : null;
         }
 
-        const today = new Date().toISOString().slice(0, 10);
+        const now = new Date();
+        const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
         let data = null;
         if (Object.keys(updates).length > 0) {
