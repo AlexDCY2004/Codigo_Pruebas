@@ -4,7 +4,7 @@ import Doctor from './doctor.js';
 import Paciente from './paciente.js';
 import Tratamiento from './tratamiento.js';
 
-const ESTADOS_CITA = ['Agendada', 'Confirmada', 'Atendida', 'Cancelada'];
+const ESTADOS_CITA = ['agendada', 'confirmada', 'atendida', 'cancelada'];
 
 export const Cita = sequelize.define(
   'Cita',
@@ -61,7 +61,7 @@ export const Cita = sequelize.define(
     estado: {
       type: DataTypes.STRING(50),
       allowNull: false,
-      defaultValue: 'Agendada',
+      defaultValue: 'agendada',
       validate: {
         isIn: { args: [ESTADOS_CITA], msg: 'Estado de cita inválido' }
       }

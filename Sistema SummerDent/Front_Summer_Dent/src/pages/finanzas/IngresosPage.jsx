@@ -488,7 +488,7 @@ export default function IngresosPage() {
                   <ReadRow label="Fecha:" value={formatDate(selectedIngreso?.fecha)} />
                   <ReadRow label="Doctor:" value={getDoctorLabel(selectedIngreso || {})} />
                   <ReadRow label="Tipo:" value={selectedIngreso?.tipo || 'ingreso'} />
-                      <ReadRow label="Método:" value={selectedIngreso?.metodo_pago || '-'} />
+                  <ReadRow label="Método:" value={selectedIngreso?.metodo_pago || '-'} />
                   <ReadRow label="Monto:" value={formatCurrency(selectedIngreso?.monto)} />
                   <ReadRow label="Descripción:" value={selectedIngreso?.descripcion || '-'} />
                   <ReadRow label="Fecha Registro:" value={formatDate(selectedIngreso?.created_at)} />
@@ -584,7 +584,6 @@ export default function IngresosPage() {
                         onChange={handleFormChange}
                         disabled={isIngresoBloqueado}
                       >
-                        <option value="">No especificado</option>
                         <option value="efectivo">Efectivo</option>
                         <option value="transferencia">Transferencia</option>
                         <option value="tarjeta">Tarjeta</option>
@@ -607,14 +606,14 @@ export default function IngresosPage() {
         </div>
       )}
 
-            <ConfirmModal
-              isOpen={confirmOpen}
-              title="Eliminar Ingreso"
-              message={confirmError || `¿Eliminar el ingreso de ${formatCurrency(pendingDelete?.monto || 0)}?`}
-              onConfirm={confirmDeleteIngreso}
-              onCancel={() => { setConfirmOpen(false); setPendingDelete(null); setConfirmError(''); }}
-              isLoading={isDeleting}
-            />
+      <ConfirmModal
+        isOpen={confirmOpen}
+        title="Eliminar Ingreso"
+        message={confirmError || `¿Eliminar el ingreso de ${formatCurrency(pendingDelete?.monto || 0)}?`}
+        onConfirm={confirmDeleteIngreso}
+        onCancel={() => { setConfirmOpen(false); setPendingDelete(null); setConfirmError(''); }}
+        isLoading={isDeleting}
+      />
     </div>
   );
 }

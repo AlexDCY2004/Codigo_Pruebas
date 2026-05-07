@@ -1,6 +1,6 @@
 import { getSupabaseClientWithToken, supabase, supabaseAdmin } from '../configuracionesDB/supabaseClient.js';
 
-const estadosPermitidos = ['Agendada', 'Confirmada', 'Atendida', 'Cancelada'];
+const estadosPermitidos = ['agendada', 'confirmada', 'Atendida', 'cancelada'];
 
 const esEnteroPositivo = (v) => /^\d+$/.test(String(v || '').trim()) && Number(String(v).trim()) > 0;
 const esCedulaValida = (cedula) => {
@@ -78,6 +78,16 @@ export const crearCitaController = async (req, res) => {
     }
     if (!esFechaValida(fecha)) return res.status(400).json({ error: 'fecha inválida, formato YYYY-MM-DD' });
     if (!esHoraValida(hora_inicio) || !esHoraValida(hora_fin)) return res.status(400).json({ error: 'hora_inicio/hora_fin inválida, formato HH:MM ó HH:MM:SS' });
+    // Horario de atención: 08:00 – 20:00
+    if (String(hora_inicio) < '08:00' || String(hora_inicio) >= '20:00') return res.status(400).json({ error: 'hora_inicio fuera del horario de atención (08:00 – 20:00)' });
+    if (String(hora_fin) > '20:00' || String(hora_fin) <= '08:00') return res.status(400).json({ error: 'hora_fin fuera del horario de atención (08:00 – 20:00)' });
+    if (String(hora_inicio) >= String(hora_fin)) return res.status(400).json({ error: 'hora_fin debe ser posterior a hora_inicio' });
+    // Duración máxima: 2 horas
+    {
+      const [hi, mi] = String(hora_inicio).split(':').map(Number);
+      const [hf, mf] = String(hora_fin).split(':').map(Number);
+      if ((hf * 60 + mf) - (hi * 60 + mi) > 120) return res.status(400).json({ error: 'La duración máxima de una cita es de 2 horas' });
+    }
     if (estado !== undefined && estado !== null && !estadosPermitidos.includes(String(estado))) return res.status(400).json({ error: `estado inválido. Debe ser: ${estadosPermitidos.join(', ')}` });
 
     // Verificar que paciente, doctor y tratamiento (si aplica) existen — RLS aplica
@@ -119,7 +129,7 @@ export const crearCitaController = async (req, res) => {
       hora_inicio: String(hora_inicio),
       hora_fin: String(hora_fin),
       precio: typeof precio !== 'undefined' && precio !== null ? precio : (precioCalculado !== null ? precioCalculado : 0),
-      estado: estado ? String(estado) : 'Agendada'
+      estado: estado ? String(estado) : 'agendada'
     };
 
     const { data, error } = await supabaseUser.from('cita').insert([insertObj]).select().maybeSingle();
@@ -325,11 +335,24 @@ export const actualizarCitaController = async (req, res) => {
     }
     if (hora_inicio !== undefined) {
       if (!esHoraValida(hora_inicio)) return res.status(400).json({ error: 'hora_inicio inválida' });
+      if (String(hora_inicio) < '08:00' || String(hora_inicio) >= '20:00') return res.status(400).json({ error: 'hora_inicio fuera del horario de atención (08:00 – 20:00)' });
       updates.hora_inicio = String(hora_inicio);
     }
     if (hora_fin !== undefined) {
       if (!esHoraValida(hora_fin)) return res.status(400).json({ error: 'hora_fin inválida' });
+      if (String(hora_fin) > '20:00' || String(hora_fin) <= '08:00') return res.status(400).json({ error: 'hora_fin fuera del horario de atención (08:00 – 20:00)' });
       updates.hora_fin = String(hora_fin);
+    }
+    // Validar orden y duración máxima usando los valores finales (existentes + actualizados)
+    {
+      const finalInicio = updates.hora_inicio || existing.hora_inicio;
+      const finalFin = updates.hora_fin || existing.hora_fin;
+      if (finalInicio && finalFin) {
+        if (String(finalInicio) >= String(finalFin)) return res.status(400).json({ error: 'hora_fin debe ser posterior a hora_inicio' });
+        const [hi, mi] = String(finalInicio).split(':').map(Number);
+        const [hf, mf] = String(finalFin).split(':').map(Number);
+        if ((hf * 60 + mf) - (hi * 60 + mi) > 120) return res.status(400).json({ error: 'La duración máxima de una cita es de 2 horas' });
+      }
     }
     if (precio !== undefined) {
       const p = Number(precio);
