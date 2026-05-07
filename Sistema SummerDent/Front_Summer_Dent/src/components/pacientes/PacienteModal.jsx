@@ -70,7 +70,17 @@ export default function PacienteModal({ isOpen, onClose, onSubmit, initialData, 
       newErrors.fecha_nacimiento = 'Fecha de nacimiento requerida';
     } else {
       const fechaError = validarFechaNoFutura(formData.fecha_nacimiento);
-      if (fechaError) newErrors.fecha_nacimiento = fechaError;
+      if (fechaError) {
+        newErrors.fecha_nacimiento = fechaError;
+      } else {
+        // Validar que la fecha no sea mayor a 110 años atrás
+        const hoy = new Date();
+        const minDate = new Date(hoy.getFullYear() - 110, hoy.getMonth(), hoy.getDate());
+        const fechaNac = new Date(formData.fecha_nacimiento + 'T00:00:00');
+        if (fechaNac < minDate) {
+          newErrors.fecha_nacimiento = 'La fecha de nacimiento no puede ser mayor a 110 años atrás';
+        }
+      }
     }
 
     // Teléfono (opcional, pero si se ingresa debe ser 10 dígitos)
