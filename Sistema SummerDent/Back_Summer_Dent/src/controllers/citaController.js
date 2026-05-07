@@ -1,6 +1,6 @@
 import { getSupabaseClientWithToken, supabase, supabaseAdmin } from '../configuracionesDB/supabaseClient.js';
 
-const estadosPermitidos = ['agendada', 'confirmada', 'Atendida', 'cancelada'];
+const estadosPermitidos = ['Agendada', 'Confirmada', 'Atendida', 'Cancelada'];
 
 const esEnteroPositivo = (v) => /^\d+$/.test(String(v || '').trim()) && Number(String(v).trim()) > 0;
 const esCedulaValida = (cedula) => {
@@ -119,7 +119,7 @@ export const crearCitaController = async (req, res) => {
       hora_inicio: String(hora_inicio),
       hora_fin: String(hora_fin),
       precio: typeof precio !== 'undefined' && precio !== null ? precio : (precioCalculado !== null ? precioCalculado : 0),
-      estado: estado ? String(estado) : 'agendada'
+      estado: estado ? String(estado) : 'Agendada'
     };
 
     const { data, error } = await supabaseUser.from('cita').insert([insertObj]).select().maybeSingle();
