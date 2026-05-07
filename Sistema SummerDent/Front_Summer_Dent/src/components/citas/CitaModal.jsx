@@ -68,7 +68,7 @@ const getInitialFormData = (initialData, tratamientos) => {
     hora_inicio: initialData?.hora_inicio || '',
     hora_fin: initialData?.hora_fin || '',
     precio: initialData?.precio !== undefined && initialData?.precio !== null ? String(initialData.precio) : '',
-    estado: initialData?.estado || 'Agendada'
+    estado: initialData?.estado || 'agendada'
   };
 };
 
@@ -215,10 +215,25 @@ export default function CitaModal({ isOpen, onClose, onSubmit, initialData, isLo
       }
     }
     if (!formData.hora_inicio) newErrors.hora_inicio = 'Hora inicio requerida';
+    else if (formData.hora_inicio < '08:00') newErrors.hora_inicio = 'El horario de atención inicia a las 08:00';
+    else if (formData.hora_inicio >= '20:00') newErrors.hora_inicio = 'El horario de atención finaliza a las 20:00';
+
     if (!formData.hora_fin) newErrors.hora_fin = 'Hora fin requerida';
+    else if (formData.hora_fin > '20:00') newErrors.hora_fin = 'El horario de atención finaliza a las 20:00';
+    else if (formData.hora_fin <= '08:00') newErrors.hora_fin = 'El horario de atención inicia a las 08:00';
     
     if (formData.hora_inicio && formData.hora_fin && formData.hora_inicio >= formData.hora_fin) {
       newErrors.hora_fin = 'Hora fin debe ser posterior a hora inicio';
+    }
+
+    // Validar duración máxima de 2 horas
+    if (formData.hora_inicio && formData.hora_fin && formData.hora_inicio < formData.hora_fin && !newErrors.hora_inicio && !newErrors.hora_fin) {
+      const [hi, mi] = formData.hora_inicio.split(':').map(Number);
+      const [hf, mf] = formData.hora_fin.split(':').map(Number);
+      const duracionMinutos = (hf * 60 + mf) - (hi * 60 + mi);
+      if (duracionMinutos > 120) {
+        newErrors.hora_fin = 'La duración máxima de una cita es de 2 horas';
+      }
     }
     
     setErrors(newErrors);
@@ -233,7 +248,7 @@ export default function CitaModal({ isOpen, onClose, onSubmit, initialData, isLo
     if (name === 'estado' && String(value) === 'Atendida') {
       const wasAttended = initialData && String(initialData.estado) === 'Atendida';
       if (!wasAttended && String(formData.estado) !== 'Atendida') {
-        setPrevEstado(String(formData.estado || 'Agendada'));
+        setPrevEstado(String(formData.estado || 'agendada'));
         // preasignar estado pero esperar confirmación de pago
         setFormData(prev => ({ ...prev, [name]: value }));
         setPaymentMethod('efectivo');
@@ -534,10 +549,10 @@ export default function CitaModal({ isOpen, onClose, onSubmit, initialData, isLo
                     value={formData.estado}
                     onChange={handleChange}
                   >
-                    <option value="Agendada">Agendada</option>
-                    <option value="Confirmada">Confirmada</option>
+                    <option value="agendada">Agendada</option>
+                    <option value="confirmada">Confirmada</option>
                     <option value="Atendida">Atendida</option>
-                    <option value="Cancelada">Cancelada</option>
+                    <option value="cancelada">Cancelada</option>
                   </select>
                   {/* Mostrar sección de pago directamente debajo del campo Estado cuando corresponde */}
                   {!readOnly && isPaymentModalOpen && (
