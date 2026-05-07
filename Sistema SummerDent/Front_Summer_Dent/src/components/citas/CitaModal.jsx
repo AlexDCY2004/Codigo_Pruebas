@@ -68,7 +68,7 @@ const getInitialFormData = (initialData, tratamientos) => {
     hora_inicio: initialData?.hora_inicio || '',
     hora_fin: initialData?.hora_fin || '',
     precio: initialData?.precio !== undefined && initialData?.precio !== null ? String(initialData.precio) : '',
-    estado: initialData?.estado || 'agendada'
+    estado: initialData?.estado || 'Agendada'
   };
 };
 
@@ -233,7 +233,7 @@ export default function CitaModal({ isOpen, onClose, onSubmit, initialData, isLo
     if (name === 'estado' && String(value) === 'Atendida') {
       const wasAttended = initialData && String(initialData.estado) === 'Atendida';
       if (!wasAttended && String(formData.estado) !== 'Atendida') {
-        setPrevEstado(String(formData.estado || 'agendada'));
+        setPrevEstado(String(formData.estado || 'Agendada'));
         // preasignar estado pero esperar confirmación de pago
         setFormData(prev => ({ ...prev, [name]: value }));
         setPaymentMethod('efectivo');
@@ -534,10 +534,10 @@ export default function CitaModal({ isOpen, onClose, onSubmit, initialData, isLo
                     value={formData.estado}
                     onChange={handleChange}
                   >
-                    <option value="agendada">Agendada</option>
-                    <option value="confirmada">Confirmada</option>
+                    <option value="Agendada">Agendada</option>
+                    <option value="Confirmada">Confirmada</option>
                     <option value="Atendida">Atendida</option>
-                    <option value="cancelada">Cancelada</option>
+                    <option value="Cancelada">Cancelada</option>
                   </select>
                   {/* Mostrar sección de pago directamente debajo del campo Estado cuando corresponde */}
                   {!readOnly && isPaymentModalOpen && (
