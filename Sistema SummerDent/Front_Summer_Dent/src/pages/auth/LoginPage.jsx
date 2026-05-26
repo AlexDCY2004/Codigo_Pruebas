@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import apiClient from '../../services/api/client';
 import { useAuthStore } from '../../store/authStore';
 import logoImage from '../../assets/Logo.png';
-import { sanitizeEmail, validarEmail } from '../../utils/sanitize';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -16,37 +15,12 @@ export default function LoginPage() {
 
   const handleChange = (event) => {
     const { name, value } = event.target;
-
-    if (name === 'email') {
-      setForm((prev) => ({ ...prev, email: sanitizeEmail(value, 100) }));
-      return;
-    }
-
-    // Password: limitar longitud
-    if (name === 'password') {
-      setForm((prev) => ({ ...prev, password: value.slice(0, 128) }));
-      return;
-    }
-
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
     setErrorMessage('');
-
-    // Validar email
-    const emailError = validarEmail(form.email);
-    if (emailError) {
-      setErrorMessage(emailError);
-      return;
-    }
-
-    if (!form.password) {
-      setErrorMessage('La contraseña es obligatoria');
-      return;
-    }
-
     setIsLoading(true);
 
     try {
@@ -56,9 +30,19 @@ export default function LoginPage() {
       });
 
       setSession({
-        token: data?.access_token,
         user: data?.usuario || null
       });
+
+      // Fallback de desarrollo: si el backend devuelve tokens (solo en dev),
+      // aplicarlos como Authorization header para permitir el flujo local
+      // cuando las cookies cross-site no se establezcan correctamente.
+      if (data?.accessToken) {
+        try {
+          apiClient.defaults.headers.common['Authorization'] = `Bearer ${data.accessToken}`;
+        } catch (e) {
+          void e;
+        }
+      }
 
       navigate('/dashboard', { replace: true });
     } catch (error) {

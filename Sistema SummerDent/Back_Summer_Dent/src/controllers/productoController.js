@@ -1,4 +1,6 @@
 import { getSupabaseClientWithToken } from '../configuracionesDB/supabaseClient.js';
+import { getPerfilFromToken } from '../utils/perfilUtils.js';
+import { getAuthTokenFromReq } from '../utils/authUtils.js';
 
 const precioRegex = /^\d+(?:\.\d{1,2})?$/; // permite decimales con hasta 2 cifras
 const stockRegex = /^\d+$/;
@@ -15,15 +17,46 @@ const esStockSoloNumeros = (stock) => {
     return stockRegex.test(String(stock).trim());
 };
 
+const getTodayInputDate = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
+const getMaxInputDate = () => {
+    const now = new Date();
+    now.setFullYear(now.getFullYear() + 5);
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
+const parseFechaCaducidad = (fecha) => {
+    if (fecha === undefined || fecha === null || String(fecha).trim() === '') return null;
+    const raw = String(fecha).trim().slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return null;
+    return raw;
+};
+
+const esFechaCaducidadValida = (fechaCaducidad) => {
+    if (fechaCaducidad === undefined || fechaCaducidad === null || String(fechaCaducidad).trim() === '') return true;
+    const raw = String(fechaCaducidad).trim().slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return false;
+    return raw >= getTodayInputDate() && raw <= getMaxInputDate();
+};
+
 export const crearProductoController = async (req, res) => {
     try {
-        const token = (req.headers.authorization || '').startsWith('Bearer ') ? req.headers.authorization.replace('Bearer ', '').trim() : null;
+        const token = getAuthTokenFromReq(req);
         if (!token) return res.status(401).json({ error: 'Token no proporcionado' });
         const supabaseUser = getSupabaseClientWithToken(token);
 
-        const { nombre, descripcion, categoria, stock_producto, stock_minimo, precio } = req.body;
+        const { nombre, descripcion, categoria, stock_producto, stock_minimo, precio, fecha_caducidad } = req.body;
 
-        // Todos los campos obligatorios
+        // Campos base obligatorios; fecha_caducidad es opcional ramaAlex
         if (!nombre || !String(nombre).trim()) return res.status(400).json({ error: 'El nombre del producto es obligatorio' });
         if (!nombreRegex.test(String(nombre).trim())) return res.status(400).json({ error: "El nombre contiene caracteres no permitidos" });
         if (!descripcion || !String(descripcion).trim()) return res.status(400).json({ error: 'La descripción es obligatoria' });
@@ -34,6 +67,7 @@ export const crearProductoController = async (req, res) => {
         if (stock_minimo === undefined || stock_minimo === null || String(stock_minimo).trim() === '') return res.status(400).json({ error: 'stock_minimo es obligatorio' });
         if (!esStockSoloNumeros(stock_producto)) return res.status(400).json({ error: 'stock_producto debe contener solo numeros' });
         if (!esStockSoloNumeros(stock_minimo)) return res.status(400).json({ error: 'stock_minimo debe contener solo numeros' });
+        if (!esFechaCaducidadValida(fecha_caducidad)) return res.status(400).json({ error: 'fecha_caducidad debe ser una fecha válida, no anterior a hoy y no mayor a 5 años' });
 
         // Validar stocks si fueron proporcionados
         const parsedStock = stock_producto !== undefined && stock_producto !== null ? Number(stock_producto) : null;
@@ -42,7 +76,10 @@ export const crearProductoController = async (req, res) => {
         if (parsedStock !== null && (!Number.isFinite(parsedStock) || !Number.isInteger(parsedStock) || parsedStock < 0)) return res.status(400).json({ error: 'stock_producto debe ser un numero entero >= 0' });
         if (parsedMin !== null && (!Number.isFinite(parsedMin) || !Number.isInteger(parsedMin) || parsedMin < 0)) return res.status(400).json({ error: 'stock_minimo debe ser un numero entero >= 0' });
 
-        // 1) Crear producto (incluye precio si se envía)
+        // obtener perfil del usuario para determinar sede_id antes de crear el producto
+        const perfil = await getPerfilFromToken(token);
+
+        // 1) Crear producto (incluye precio y sede_id si se aplica)
         const productoPayload = {
             nombre: String(nombre).trim(),
             descripcion: descripcion ? String(descripcion).trim() : null,
@@ -54,6 +91,17 @@ export const crearProductoController = async (req, res) => {
             // Enviar con 2 decimales
             productoPayload.precio = parsedPrecio.toFixed(2);
         }
+
+        // asignar sede_id para producto según perfil / body ANTES de insertar
+        let sedeIdToUse = null;
+        if (perfil && perfil.rol === 'superadmin') {
+            // superadmin puede especificar sede_id en el body (o dejar null)
+            if (req.body && req.body.sede_id) sedeIdToUse = Number(req.body.sede_id);
+        } else if (perfil && perfil.sede_id) {
+            sedeIdToUse = perfil.sede_id;
+        }
+
+        if (sedeIdToUse !== null) productoPayload.sede_id = sedeIdToUse;
 
         const { data: productoData, error: productoError } = await supabaseUser
             .from('producto')
@@ -79,6 +127,10 @@ export const crearProductoController = async (req, res) => {
         const now = new Date();
         const todayLocal = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
+        const parsedFechaCaducidad = parseFechaCaducidad(fecha_caducidad);
+
+        // Reutilizar `sedeIdToUse` ya calculado arriba para asignar al inventario si aplica
+
         const inventarioPayload = {
             id_producto: productoData.id,
             id_perfil: perfilId,
@@ -87,6 +139,13 @@ export const crearProductoController = async (req, res) => {
             precio: productoData.precio !== null && productoData.precio !== undefined ? Number(productoData.precio).toFixed(2) : '0.00',
             fecha_actualizacion: todayLocal
         };
+
+        // incluir fecha de caducidad si fue provista y parseada correctamente
+        if (parsedFechaCaducidad !== null) {
+            inventarioPayload.fecha_caducidad = parsedFechaCaducidad;
+        }
+
+        if (sedeIdToUse !== null) inventarioPayload.sede_id = sedeIdToUse;
 
         const { data: invData, error: invError } = await supabaseUser.from('inventario').insert([inventarioPayload]).select().maybeSingle();
 
@@ -104,11 +163,18 @@ export const crearProductoController = async (req, res) => {
 
 export const obtenerProductosController = async (_req, res) => {
     try {
-        const token = ((_req && _req.headers && _req.headers.authorization) || '').startsWith('Bearer ') ? ((_req.headers.authorization || '').replace('Bearer ', '').trim()) : null;
+        const token = getAuthTokenFromReq(_req);
         if (!token) return res.status(401).json({ error: 'Token no proporcionado' });
         const supabaseUser = getSupabaseClientWithToken(token);
 
-        const { data, error } = await supabaseUser.from('producto').select('*').order('id', { ascending: false });
+        const sedeId = _req && _req.query ? _req.query.sede_id : null;
+        let query = supabaseUser.from('producto').select('*').order('id', { ascending: false });
+        if (sedeId !== undefined && sedeId !== null && String(sedeId).trim() !== '') {
+            const sid = Number(sedeId);
+            if (!Number.isNaN(sid)) query = query.eq('sede_id', sid);
+        }
+
+        const { data, error } = await query;
         if (error) return res.status(500).json({ error: error.message || error });
         return res.json(data);
     } catch (error) {
@@ -118,7 +184,7 @@ export const obtenerProductosController = async (_req, res) => {
 
 export const obtenerProductoPorIdController = async (req, res) => {
     try {
-        const token = (req.headers.authorization || '').startsWith('Bearer ') ? req.headers.authorization.replace('Bearer ', '').trim() : null;
+        const token = getAuthTokenFromReq(req);
         if (!token) return res.status(401).json({ error: 'Token no proporcionado' });
         const supabaseUser = getSupabaseClientWithToken(token);
 
@@ -134,12 +200,12 @@ export const obtenerProductoPorIdController = async (req, res) => {
 
 export const actualizarProductoController = async (req, res) => {
     try {
-        const token = (req.headers.authorization || '').startsWith('Bearer ') ? req.headers.authorization.replace('Bearer ', '').trim() : null;
+        const token = getAuthTokenFromReq(req);
         if (!token) return res.status(401).json({ error: 'Token no proporcionado' });
         const supabaseUser = getSupabaseClientWithToken(token);
 
         const { id } = req.params;
-        const { nombre, descripcion, categoria, precio, stock_producto, stock_minimo } = req.body;
+        const { nombre, descripcion, categoria, precio, stock_producto, stock_minimo, fecha_caducidad } = req.body;
 
         const { data: existing, error: fetchErr } = await supabaseUser.from('producto').select('id').eq('id', id).maybeSingle();
         if (fetchErr) return res.status(500).json({ error: fetchErr.message || fetchErr });
@@ -147,7 +213,7 @@ export const actualizarProductoController = async (req, res) => {
 
         // Para actualización requerimos todos los campos (evitamos updates parciales)
         if (nombre === undefined || descripcion === undefined || categoria === undefined || precio === undefined || stock_producto === undefined || stock_minimo === undefined) {
-            return res.status(400).json({ error: 'Todos los campos son obligatorios para actualizar el producto' });
+            return res.status(400).json({ error: 'Nombre, descripción, categoría, precio, stock_producto y stock_minimo son obligatorios para actualizar el producto' });
         }
 
         if (!String(nombre).trim()) return res.status(400).json({ error: 'El nombre del producto no puede estar vacío' });
@@ -157,6 +223,9 @@ export const actualizarProductoController = async (req, res) => {
         if (!esPrecioValido(precio)) return res.status(400).json({ error: 'precio inválido (usa formato 0 o 0.00)' });
         if (!esStockSoloNumeros(stock_producto)) return res.status(400).json({ error: 'stock_producto debe contener solo numeros' });
         if (!esStockSoloNumeros(stock_minimo)) return res.status(400).json({ error: 'stock_minimo debe contener solo numeros' });
+        if (fecha_caducidad !== undefined && fecha_caducidad !== null && String(fecha_caducidad).trim() !== '' && !esFechaCaducidadValida(fecha_caducidad)) {
+            return res.status(400).json({ error: 'fecha_caducidad debe ser una fecha válida, no anterior a hoy y no mayor a 5 años' });
+        }
 
         const parsedStock = stock_producto !== undefined && stock_producto !== null ? Number(stock_producto) : null;
         const parsedMin = stock_minimo !== undefined && stock_minimo !== null ? Number(stock_minimo) : null;
@@ -173,7 +242,6 @@ export const actualizarProductoController = async (req, res) => {
             if (parsedPrecio !== null && (!Number.isFinite(parsedPrecio) || parsedPrecio < 0)) return res.status(400).json({ error: 'precio debe ser un número >= 0' });
             updates.precio = parsedPrecio !== null ? parsedPrecio.toFixed(2) : null;
         }
-
         const now = new Date();
         const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
@@ -192,6 +260,8 @@ export const actualizarProductoController = async (req, res) => {
         if (parsedStock !== null) inventarioUpdates.stock_producto = Math.floor(parsedStock);
         if (parsedMin !== null) inventarioUpdates.stock_minimo = Math.floor(parsedMin);
         if (updates.precio !== undefined && updates.precio !== null) inventarioUpdates.precio = updates.precio;
+        const parsedFechaCaducidad = parseFechaCaducidad(fecha_caducidad);
+        if (parsedFechaCaducidad !== null) inventarioUpdates.fecha_caducidad = parsedFechaCaducidad;
 
         if (Object.keys(inventarioUpdates).length > 0) {
             inventarioUpdates.fecha_actualizacion = today;
@@ -211,7 +281,7 @@ export const actualizarProductoController = async (req, res) => {
 
 export const eliminarProductoController = async (req, res) => {
     try {
-        const token = (req.headers.authorization || '').startsWith('Bearer ') ? req.headers.authorization.replace('Bearer ', '').trim() : null;
+        const token = getAuthTokenFromReq(req);
         if (!token) return res.status(401).json({ error: 'Token no proporcionado' });
         const supabaseUser = getSupabaseClientWithToken(token);
 

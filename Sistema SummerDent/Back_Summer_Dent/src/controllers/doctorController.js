@@ -1,9 +1,12 @@
 import { getSupabaseClientWithToken } from '../configuracionesDB/supabaseClient.js';
+import { getPerfilFromToken } from '../utils/perfilUtils.js';
+import { getAuthTokenFromReq } from '../utils/authUtils.js';
 
 const estadosPermitidos = ['disponible', 'no disponible', 'eventual'];
 const correoRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const telefonoRegex = /^\d{10}$/;
-const nombreRegex = /^[A-Za-zÁÉÍÓÚáéíóúÑñ]+(?:[ '.\-][A-Za-zÁÉÍÓÚáéíóúÑñ]+)*$/;
+const telefonoRepetidosRegex = /(\d)\1{3,}/; // detecta 4 o más dígitos iguales consecutivos
+const nombreRegex = /^[A-Za-zÁÉÍÓÚáéíóúÑñ.\s'-]+$/;
 
 const esIdValido = (id) => /^\d+$/.test(String(id || '').trim()) && Number(String(id).trim()) > 0;
 
@@ -23,7 +26,9 @@ const esTelefonoValido = (telefono) => {
     if (telefono === undefined || telefono === null || telefono === '') return true;
     if (typeof telefono !== 'string' && typeof telefono !== 'number') return false;
     const limpio = String(telefono).trim();
-    return telefonoRegex.test(limpio);
+    if (!telefonoRegex.test(limpio)) return false;
+    if (telefonoRepetidosRegex.test(limpio)) return false;
+    return true;
 };
 
 const esNombreValido = (nombre) => {
@@ -33,7 +38,7 @@ const esNombreValido = (nombre) => {
 
 export const crearDoctorController = async (req, res) => {
     try {
-        const token = (req.headers.authorization || '').startsWith('Bearer ') ? req.headers.authorization.replace('Bearer ', '').trim() : null;
+        const token = getAuthTokenFromReq(req);
         if (!token) return res.status(401).json({ error: 'Token no proporcionado' });
 
         const supabaseUser = getSupabaseClientWithToken(token);
@@ -69,7 +74,7 @@ export const crearDoctorController = async (req, res) => {
         }
 
         if (!esTelefonoValido(telefono)) {
-            return res.status(400).json({ error: 'El telefono debe contener solo digitos y tener exactamente 10 dígitos' });
+            return res.status(400).json({ error: 'El telefono debe contener solo digitos, tener exactamente 10 dígitos y no puede tener más de 3 dígitos iguales consecutivos' });
         }
 
         if (typeof estado !== 'undefined' && typeof estado !== 'string') {
@@ -80,19 +85,23 @@ export const crearDoctorController = async (req, res) => {
             return res.status(400).json({ error: 'Estado inválido. Debe ser: disponible, no disponible o eventual' });
         }
 
-        const { data, error } = await supabaseUser
-            .from('doctor')
-            .insert([
-                {
-                    nombre: String(nombre).trim(),
-                    telefono: telefono ? String(telefono).trim() : null,
-                    correo: String(correo).trim().toLowerCase(),
-                    especialidad: String(especialidad).trim(),
-                    estado: estado ? String(estado).trim().toLowerCase() : 'disponible'
-                }
-            ])
-            .select()
-            .single();
+        const perfil = await getPerfilFromToken(token);
+
+        const insertObj = {
+            nombre: String(nombre).trim(),
+            telefono: telefono ? String(telefono).trim() : null,
+            correo: String(correo).trim().toLowerCase(),
+            especialidad: String(especialidad).trim(),
+            estado: estado ? String(estado).trim().toLowerCase() : 'disponible'
+        };
+
+        if (perfil && perfil.rol === 'superadmin') {
+            if (req.body && req.body.sede_id) insertObj.sede_id = Number(req.body.sede_id);
+        } else if (perfil && perfil.sede_id) {
+            insertObj.sede_id = perfil.sede_id;
+        }
+
+        const { data, error } = await supabaseUser.from('doctor').insert([insertObj]).select().single();
 
         if (error) {
             return res.status(400).json({ error: error.message || error });
@@ -106,14 +115,18 @@ export const crearDoctorController = async (req, res) => {
 
 export const obtenerDoctoresController = async (_req, res) => {
     try {
-        const token = ( (_req && _req.headers && _req.headers.authorization) || '' ).startsWith('Bearer ') ? ((_req.headers.authorization || '').replace('Bearer ', '').trim()) : null;
+        const token = getAuthTokenFromReq(_req);
         if (!token) return res.status(401).json({ error: 'Token no proporcionado' });
         const supabaseUser = getSupabaseClientWithToken(token);
 
-        const { data, error } = await supabaseUser
-            .from('doctor')
-            .select('*')
-            .order('id', { ascending: false });
+        const sedeId = _req && _req.query ? _req.query.sede_id : null;
+        let query = supabaseUser.from('doctor').select('*').order('id', { ascending: false });
+        if (sedeId !== undefined && sedeId !== null && String(sedeId).trim() !== '') {
+            const sid = Number(sedeId);
+            if (!Number.isNaN(sid)) query = query.eq('sede_id', sid);
+        }
+
+        const { data, error } = await query;
 
         if (error) return res.status(500).json({ error: error.message });
 
@@ -125,7 +138,7 @@ export const obtenerDoctoresController = async (_req, res) => {
 
 export const obtenerDoctorPorIdController = async (req, res) => {
     try {
-        const token = (req.headers.authorization || '').startsWith('Bearer ') ? req.headers.authorization.replace('Bearer ', '').trim() : null;
+        const token = getAuthTokenFromReq(req);
         if (!token) return res.status(401).json({ error: 'Token no proporcionado' });
         const supabaseUser = getSupabaseClientWithToken(token);
 
@@ -152,7 +165,7 @@ export const obtenerDoctorPorIdController = async (req, res) => {
 
 export const actualizarDoctorController = async (req, res) => {
     try {
-        const token = (req.headers.authorization || '').startsWith('Bearer ') ? req.headers.authorization.replace('Bearer ', '').trim() : null;
+        const token = getAuthTokenFromReq(req);
         if (!token) return res.status(401).json({ error: 'Token no proporcionado' });
         const supabaseUser = getSupabaseClientWithToken(token);
 
@@ -183,7 +196,7 @@ export const actualizarDoctorController = async (req, res) => {
         if (nombre !== undefined && !esNombreValido(nombre)) return res.status(400).json({ error: 'El nombre solo debe contener letras, espacios y puntos' });
         if (correo !== undefined && !esCorreoValido(correo)) return res.status(400).json({ error: 'El correo debe tener formato valido y entre 5 y 64 caracteres' });
         if (especialidad !== undefined && !esTextoValido(especialidad, 2, 64)) return res.status(400).json({ error: 'La especialidad debe tener entre 2 y 64 caracteres validos' });
-        if (telefono !== undefined && !esTelefonoValido(telefono)) return res.status(400).json({ error: 'El telefono debe contener solo digitos y tener exactamente 10 caracteres' });
+        if (telefono !== undefined && !esTelefonoValido(telefono)) return res.status(400).json({ error: 'El telefono debe contener solo digitos, tener exactamente 10 caracteres y no puede tener más de 3 dígitos iguales consecutivos' });
         if (estado !== undefined && typeof estado !== 'string') return res.status(400).json({ error: 'El estado debe ser texto' });
 
         // Validaciones simples
@@ -221,7 +234,7 @@ export const actualizarDoctorController = async (req, res) => {
 
 export const eliminarDoctorController = async (req, res) => {
     try {
-        const token = (req.headers.authorization || '').startsWith('Bearer ') ? req.headers.authorization.replace('Bearer ', '').trim() : null;
+        const token = getAuthTokenFromReq(req);
         if (!token) return res.status(401).json({ error: 'Token no proporcionado' });
         const supabaseUser = getSupabaseClientWithToken(token);
 

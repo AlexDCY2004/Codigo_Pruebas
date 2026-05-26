@@ -14,6 +14,11 @@ import { useAuthStore } from '../../store/authStore';
 
 function PrivateRoute() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const authReady = useAuthStore((state) => state.authReady);
+
+  if (!authReady) {
+    return null;
+  }
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
@@ -24,6 +29,11 @@ function PrivateRoute() {
 
 function PublicOnlyRoute() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const authReady = useAuthStore((state) => state.authReady);
+
+  if (!authReady) {
+    return null;
+  }
 
   if (isAuthenticated) {
     return <Navigate to="/dashboard" replace />;

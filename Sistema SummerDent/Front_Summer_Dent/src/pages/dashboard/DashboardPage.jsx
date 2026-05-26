@@ -5,6 +5,7 @@ import ErrorState from '../../components/feedback/ErrorState';
 import LoadingState from '../../components/feedback/LoadingState';
 import { quickActions } from '../../lib/dashboardData';
 import { fetchDashboardSnapshot } from '../../services/api/dashboard';
+import { useEffect } from 'react';
 
 const statIcons = {
   'citas-hoy': 'calendar',
@@ -51,6 +52,13 @@ export default function DashboardPage() {
     }
   });
 
+  useEffect(() => {
+    // Reserved: previously fetched sedes here for inline selector. Now the selector
+    // lives in AppShell and fetches its own sedes. Keep this effect empty to avoid
+    // accidental network calls while preserving structure for future changes.
+    return undefined;
+  }, []);
+
   const currency = new Intl.NumberFormat('es-EC', {
     style: 'currency',
     currency: 'USD',
@@ -94,7 +102,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <section className="dashboard-grid">
+    <section className={`dashboard-grid mode-${mode}`}>
       <div className="dashboard-topbar">
         <div className="dashboard-title">
           <h1>Dashboard Principal</h1>
@@ -102,16 +110,54 @@ export default function DashboardPage() {
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <button className={`seg-btn ${mode === 'hoy' ? 'is-active' : ''}`} onClick={() => { setMode('hoy'); setDesde(today); setHasta(today); }}>Hoy</button>
-            <button className={`seg-btn ${mode === 'rango' ? 'is-active' : ''}`} onClick={() => setMode('rango')}>Rango</button>
-            <button className={`seg-btn ${mode === 'acumulado' ? 'is-active' : ''}`} onClick={() => { setMode('acumulado'); setDesde(''); setHasta(today); }}>Acumulado</button>
+            <button
+              className={`seg-btn seg-btn--hoy ${mode === 'hoy' ? 'is-active' : ''}`}
+              aria-pressed={mode === 'hoy'}
+              onClick={() => { setMode('hoy'); setDesde(today); setHasta(today); }}
+            >
+              Hoy
+            </button>
+            <button
+              className={`seg-btn seg-btn--rango ${mode === 'rango' ? 'is-active' : ''}`}
+              aria-pressed={mode === 'rango'}
+              onClick={() => setMode('rango')}
+            >
+              Rango
+            </button>
+            <button
+              className={`seg-btn seg-btn--acumulado ${mode === 'acumulado' ? 'is-active' : ''}`}
+              aria-pressed={mode === 'acumulado'}
+              onClick={() => { setMode('acumulado'); setDesde(''); setHasta(today); }}
+            >
+              Total
+            </button>
           </div>
           {mode === 'rango' && (
-            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-              <input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} />
-              <input type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} />
+            <>
+            <div className="dashboard-range-picker">
+              <label className="dashboard-range-field">
+                <span>Desde</span>
+                <input
+                  type="date"
+                  value={desde}
+                  onChange={(e) => setDesde(e.target.value)}
+                  className="dashboard-date-input"
+                />
+              </label>
+              <label className="dashboard-range-field">
+                <span>Hasta</span>
+                <input
+                  type="date"
+                  value={hasta}
+                  onChange={(e) => setHasta(e.target.value)}
+                  className="dashboard-date-input"
+                />
+              </label>
             </div>
+            </>
           )}
+
+          {/* selector removed from dashboard topbar - now only under Summer Dent header */}
         </div>
       </div>
 

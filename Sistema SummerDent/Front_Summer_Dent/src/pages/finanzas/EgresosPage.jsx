@@ -1,24 +1,30 @@
 import { useMemo, useState } from 'react';
-import { Eye, Edit2, Trash2 } from 'lucide-react';
+import { Eye, Edit2 } from 'lucide-react';
 import ConfirmModal from '../../components/ui/ConfirmModal';
 import Button from '../../components/ui/Button';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   createMovimientoFinanzas,
-  deleteMovimientoFinanzas,
   fetchEgresos,
   updateMovimientoFinanzas
 } from '../../services/api/movimientoFinanzas';
 import { fetchDoctores } from '../../services/api/doctores';
 import ErrorState from '../../components/feedback/ErrorState';
-import { sanitizeText, sanitizeDecimal } from '../../utils/sanitize';
+
+const getTodayInputDate = () => {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${dd}`;
+};
 
 const initialFormState = {
   id_doctor: '',
   monto: '',
   descripcion: '',
-  metodo_pago: '',
-  fecha: ''
+  metodo_pago: 'efectivo',
+  fecha: getTodayInputDate()
 };
 
 const formatCurrency = (value) => new Intl.NumberFormat('es-EC', {
@@ -69,6 +75,27 @@ const toInputDate = (value) => {
   return `${y}-${m}-${d}`;
 };
 
+const sanitizeMontoInput = (raw) => {
+  const s = String(raw || '');
+  let cleaned = s.replace(/[^0-9.]/g, '');
+  if (!cleaned) return '';
+  const firstDot = cleaned.indexOf('.');
+  if (firstDot !== -1) {
+    cleaned = cleaned.slice(0, firstDot + 1) + cleaned.slice(firstDot + 1).replace(/\./g, '');
+  }
+  const parts = cleaned.split('.');
+  let intPart = parts[0] || '';
+  let decPart = parts[1] || '';
+  intPart = intPart.slice(0, 5);
+  decPart = decPart.slice(0, 2);
+  if (cleaned.endsWith('.') && decPart === '') {
+    if (intPart === '') return '0.';
+    return `${intPart}.`;
+  }
+  if (decPart) return `${intPart}.${decPart}`;
+  return intPart;
+};
+
 const ReadRow = ({ label, value }) => (
   <div className="finance-read-row">
     <div className="finance-read-label">{label}</div>
@@ -97,11 +124,6 @@ export default function EgresosPage() {
   const [errorMessage, setErrorMessage] = useState('');
   const [formData, setFormData] = useState(initialFormState);
   const [formErrors, setFormErrors] = useState({});
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const [pendingDelete, setPendingDelete] = useState(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [confirmError, setConfirmError] = useState('');
-
   const { data: egresos = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['egresos', desde, hasta, metodoPago],
     queryFn: () => fetchEgresos({ desde: desde || undefined, hasta: hasta || undefined, metodo_pago: metodoPago || undefined })
@@ -167,33 +189,6 @@ export default function EgresosPage() {
     setIsModalOpen(true);
   };
 
-  const handleDeleteEgreso = (egreso) => {
-    setPendingDelete(egreso);
-    setConfirmError('');
-    setConfirmOpen(true);
-  };
-
-  const confirmDeleteEgreso = async () => {
-    if (!pendingDelete) return;
-    setIsDeleting(true);
-    try {
-      await deleteMovimientoFinanzas(pendingDelete.id);
-      queryClient.invalidateQueries({ queryKey: ['egresos'] });
-      setConfirmOpen(false);
-      setPendingDelete(null);
-    } catch (error) {
-      const raw = error.response?.data?.error || error.message || '';
-      let friendly = 'No se pudo eliminar el egreso.';
-      if (String(raw).toLowerCase().includes('foreign key') || String(raw).toLowerCase().includes('violates')) {
-        friendly = 'No se puede eliminar el egreso porque está en uso.';
-      }
-      setConfirmError(friendly);
-      setErrorMessage(friendly);
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
   const handleViewEgreso = (egreso) => {
     setSelectedEgreso(egreso);
     setIsViewMode(true);
@@ -214,10 +209,12 @@ export default function EgresosPage() {
 
     if (!formData.monto.trim()) {
       nextErrors.monto = 'El monto es obligatorio';
-    } else if (!/^\d+(\.\d{1,2})?$/.test(formData.monto.trim())) {
-      nextErrors.monto = 'El monto debe ser un número válido';
+    } else if (!/^\d{1,5}(\.\d{1,2})?$/.test(formData.monto.trim())) {
+      nextErrors.monto = 'El monto debe tener hasta 5 dígitos enteros y hasta 2 decimales';
     } else if (Number(formData.monto) <= 0) {
       nextErrors.monto = 'El monto debe ser mayor a 0';
+    } else if (Number(formData.monto) > 99999.99) {
+      nextErrors.monto = 'El monto no puede ser mayor a 99999.99';
     }
 
     if (formData.descripcion && formData.descripcion.length > 300) {
@@ -228,28 +225,25 @@ export default function EgresosPage() {
       nextErrors.fecha = 'La fecha debe tener formato YYYY-MM-DD';
     }
 
+    // For new egresos, require the fecha to be today's date
+    if (!selectedEgreso) {
+      const today = getTodayInputDate();
+      if (!formData.fecha || formData.fecha !== today) {
+        nextErrors.fecha = 'Para un nuevo egreso la fecha debe ser la fecha actual';
+      }
+    }
+
     setFormErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   };
 
   const handleFormChange = (event) => {
     const { name, value } = event.target;
-
-    let sanitized = value;
-    switch (name) {
-      case 'monto':
-        sanitized = sanitizeDecimal(value);
-        break;
-      case 'descripcion':
-        sanitized = sanitizeText(value, 300);
-        break;
-      default:
-        break;
-    }
-
+    let nextValue = value;
+    if (name === 'monto') nextValue = sanitizeMontoInput(value);
     setFormData((prev) => ({
       ...prev,
-      [name]: sanitized
+      [name]: nextValue
     }));
 
     if (formErrors[name]) {
@@ -257,6 +251,17 @@ export default function EgresosPage() {
         ...prev,
         [name]: ''
       }));
+    }
+  };
+
+  const handlePaste = (event) => {
+    const { name } = event.target;
+    if (name === 'monto') {
+      event.preventDefault();
+      const paste = (event.clipboardData || window.clipboardData).getData('text') || '';
+      const sanitized = sanitizeMontoInput(paste);
+      setFormData((prev) => ({ ...prev, monto: sanitized }));
+      if (formErrors.monto) setFormErrors((prev) => ({ ...prev, monto: '' }));
     }
   };
 
@@ -334,8 +339,8 @@ export default function EgresosPage() {
 
           <div style={{ marginTop: '0.75rem' }}>
             <h3 style={{ margin: 0, fontSize: '1rem' }}>Método de pago</h3>
-            <div style={{ marginTop: '0.5rem' }}>
-              <select value={metodoPago} onChange={(e) => setMetodoPago(e.target.value)}>
+              <div style={{ marginTop: '0.5rem' }}>
+              <select value={metodoPago} onChange={(e) => setMetodoPago(e.target.value)} className="">
                 <option value="">Todos</option>
                 <option value="efectivo">Efectivo</option>
                 <option value="transferencia">Transferencia</option>
@@ -361,7 +366,7 @@ export default function EgresosPage() {
           className="search-input"
           placeholder="Buscar por fecha, doctor, monto, descripción o perfil..."
           value={searchTerm}
-          onChange={(event) => setSearchTerm(sanitizeText(event.target.value, 100))}
+          onChange={(event) => setSearchTerm(event.target.value)}
         />
       </div>
 
@@ -415,7 +420,6 @@ export default function EgresosPage() {
                   <td className="table-actions">
                     <button type="button" onClick={() => handleViewEgreso(egreso)} className="action-btn action-btn--view" title="Ver detalles"><Eye size={16} /></button>
                     <button type="button" onClick={() => openEditModal(egreso)} className="action-btn action-btn--edit" title="Editar"><Edit2 size={16} /></button>
-                    <button type="button" onClick={() => handleDeleteEgreso(egreso)} className="action-btn action-btn--delete" title="Eliminar"><Trash2 size={16} /></button>
                   </td>
                 </tr>
               ))}
@@ -471,6 +475,7 @@ export default function EgresosPage() {
                         disabled={isDoctoresLoading}
                       >
                         <option value="">No especificado</option>
+
                         {doctores.map((doc) => (
                           <option key={doc.id} value={String(doc.id)}>{doc.nombre}</option>
                         ))}
@@ -497,11 +502,11 @@ export default function EgresosPage() {
                       <input
                         id="monto"
                         name="monto"
-                        type="number"
-                        step="0.01"
-                        min="0"
+                        type="text"
+                        inputMode="decimal"
                         value={formData.monto}
                         onChange={handleFormChange}
+                        onPaste={handlePaste}
                         className={formErrors.monto ? 'input-error' : ''}
                         placeholder="0.00"
                       />
@@ -530,8 +535,9 @@ export default function EgresosPage() {
                         name="metodo_pago"
                         value={formData.metodo_pago}
                         onChange={handleFormChange}
+                        className={formErrors.metodo_pago ? 'input-error' : ''}
                       >
-                        <option value="">No especificado</option>
+                        
                         <option value="efectivo">Efectivo</option>
                         <option value="transferencia">Transferencia</option>
                         <option value="tarjeta">Tarjeta</option>
@@ -553,15 +559,6 @@ export default function EgresosPage() {
           </div>
         </div>
       )}
-
-            <ConfirmModal
-              isOpen={confirmOpen}
-              title="Eliminar Egreso"
-              message={confirmError || `¿Eliminar el egreso de ${formatCurrency(pendingDelete?.monto || 0)}?`}
-              onConfirm={confirmDeleteEgreso}
-              onCancel={() => { setConfirmOpen(false); setPendingDelete(null); setConfirmError(''); }}
-              isLoading={isDeleting}
-            />
     </div>
   );
 }

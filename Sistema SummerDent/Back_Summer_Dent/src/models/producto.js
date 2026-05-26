@@ -1,5 +1,6 @@
 import { DataTypes } from 'sequelize';
 import { sequelize } from '../configuracionesDB/database.js';
+import Sede from './sede.js';
 
 export const Producto = sequelize.define(
     'Producto',
@@ -48,6 +49,11 @@ export const Producto = sequelize.define(
             allowNull: false,
             defaultValue: DataTypes.NOW
         }
+        ,
+        sede_id: {
+            type: DataTypes.INTEGER,
+            allowNull: true
+        }
     },
     {
         tableName: 'producto',
@@ -57,3 +63,6 @@ export const Producto = sequelize.define(
 );
 
 export default Producto;
+
+Producto.belongsTo(Sede, { foreignKey: 'sede_id', as: 'sede' });
+Sede.hasMany(Producto, { foreignKey: 'sede_id', as: 'productos' });

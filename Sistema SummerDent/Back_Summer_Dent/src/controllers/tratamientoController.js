@@ -1,7 +1,9 @@
 import { supabase, supabaseAdmin, getSupabaseClientWithToken } from '../configuracionesDB/supabaseClient.js';
+import { getPerfilFromToken } from '../utils/perfilUtils.js';
+import { getAuthTokenFromReq } from '../utils/authUtils.js';
 
 const AREAS_PERMITIDAS = [
-  'Ortodoncia General',
+  'Odontología General',
   'Ortodoncia',
   'Ortopedia',
   'Cirugía Odontológica',
@@ -15,6 +17,18 @@ const esTextoValido = (valor, min, max) => {
   if (typeof valor !== 'string') return false;
   const limpio = valor.trim();
   return limpio.length >= min && limpio.length <= max;
+};
+
+const esNombreTratamientoValido = (nombre) => {
+  if (typeof nombre !== 'string') return false;
+  const limpio = nombre.trim();
+  if (limpio.length === 0 || limpio.length > 64) return false;
+  // debe contener al menos 5 letras (no solo números)
+  const letras = (limpio.match(/[A-Za-zÁÉÍÓÚáéíóúÑñ]/g) || []).length;
+  if (letras < 5) return false;
+  // permitir letras, números, espacios y puntuación básica
+  if (!/^[A-Za-z0-9ÁÉÍÓÚáéíóúÑñ\s\-\.,]+$/.test(limpio)) return false;
+  return true;
 };
 
 
@@ -42,17 +56,15 @@ const esDescripcionValida = (descripcion) => {
 };
 
 const getTokenFromHeader = (req) => {
-  const header = req.headers.authorization || '';
-  if (!header.startsWith('Bearer ')) return null;
-  return header.replace('Bearer ', '').trim();
+  return getAuthTokenFromReq(req);
 };
 
 const checkAdmin = async (token) => {
-  const { data: { user }, error: userError } = await supabase.auth.getUser(token);
-  if (userError || !user) return false;
-  const { data: perfil, error: perfilError } = await supabaseAdmin.from('perfil').select('rol').eq('id', user.id).maybeSingle();
-  if (perfilError) return false;
-  return perfil && perfil.rol === 'administrador';
+  const perfil = await getPerfilFromToken(token);
+  if (!perfil) return null;
+  // permitir administrador o superadmin (superadmin puede gestionar cualquier sede)
+  if (perfil.rol === 'administrador' || perfil.rol === 'superadmin') return perfil;
+  return null;
 };
 
 export const crearTratamientoController = async (req, res) => {
@@ -60,8 +72,8 @@ export const crearTratamientoController = async (req, res) => {
     const token = getTokenFromHeader(req);
     if (!token) return res.status(401).json({ error: 'Token no proporcionado' });
 
-    const isAdmin = await checkAdmin(token);
-    if (!isAdmin) return res.status(403).json({ error: 'Acceso denegado. Se requieren permisos de administrador' });
+    const perfil = await checkAdmin(token);
+    if (!perfil) return res.status(403).json({ error: 'Acceso denegado. Se requieren permisos de administrador o superadmin' });
 
     const supabaseUser = getSupabaseClientWithToken(token);
     const { area, nombre, precio, descripcion } = req.body;
@@ -75,16 +87,24 @@ export const crearTratamientoController = async (req, res) => {
     if (precio === undefined || precio === null) return res.status(400).json({ error: 'El precio es obligatorio' });
 
     if (!esAreaValida(area)) return res.status(400).json({ error: `El área es inválida. Debe ser una de: ${AREAS_PERMITIDAS.join(', ')}` });
-    if (!esTextoValido(nombre, 2, 64)) return res.status(400).json({ error: 'El nombre debe tener entre 2 y 64 caracteres' });
+    if (!esNombreTratamientoValido(nombre)) return res.status(400).json({ error: 'El nombre debe contener al menos 5 letras, puede incluir números y tener hasta 64 caracteres' });
     if (!esPrecioValido(precio)) return res.status(400).json({ error: 'El precio debe ser un número positivo (puede tener decimales)' });
     if (!esDescripcionValida(descripcion)) return res.status(400).json({ error: 'La descripción no debe exceder 300 caracteres' });
 
-    const { data, error } = await supabaseUser.from('tratamiento').insert([{
+    const insertObj = {
       area: String(area).trim(),
       nombre: String(nombre).trim(),
       precio: precio,
       descripcion: descripcion ? String(descripcion).trim() : null
-    }]).select().maybeSingle();
+    };
+    // asignar sede_id: si es superadmin puede pasar sede_id en body, si es administrador usar su sede
+    if (perfil.rol === 'superadmin') {
+      if (req.body && req.body.sede_id) insertObj.sede_id = Number(req.body.sede_id);
+    } else if (perfil.sede_id) {
+      insertObj.sede_id = perfil.sede_id;
+    }
+
+    const { data, error } = await supabaseUser.from('tratamiento').insert([insertObj]).select().maybeSingle();
 
     if (error) return res.status(400).json({ error: error.message || error });
     return res.status(201).json({ mensaje: 'Tratamiento creado', tratamiento: data });
@@ -99,7 +119,14 @@ export const obtenerTratamientosController = async (req, res) => {
     if (!token) return res.status(401).json({ error: 'Token no proporcionado' });
 
     const supabaseUser = getSupabaseClientWithToken(token);
-    const { data, error } = await supabaseUser.from('tratamiento').select('*').order('id', { ascending: false });
+    const sedeId = req && req.query ? req.query.sede_id : null;
+    let query = supabaseUser.from('tratamiento').select('*').order('id', { ascending: false });
+    if (sedeId !== undefined && sedeId !== null && String(sedeId).trim() !== '') {
+      const sid = Number(sedeId);
+      if (!Number.isNaN(sid)) query = query.eq('sede_id', sid);
+    }
+
+    const { data, error } = await query;
     if (error) return res.status(500).json({ error: error.message || error });
     return res.json(data);
   } catch (error) {
@@ -131,8 +158,8 @@ export const actualizarTratamientoController = async (req, res) => {
     const token = getTokenFromHeader(req);
     if (!token) return res.status(401).json({ error: 'Token no proporcionado' });
 
-    const isAdmin = await checkAdmin(token);
-    if (!isAdmin) return res.status(403).json({ error: 'Acceso denegado. Se requieren permisos de administrador' });
+    const perfilAdmin = await checkAdmin(token);
+    if (!perfilAdmin) return res.status(403).json({ error: 'Acceso denegado. Se requieren permisos de administrador o superadmin' });
 
     const supabaseUser = getSupabaseClientWithToken(token);
     const { id } = req.params;
@@ -157,7 +184,7 @@ export const actualizarTratamientoController = async (req, res) => {
     }
 
     if (area !== undefined && area !== null && !esAreaValida(area)) return res.status(400).json({ error: `El área es inválida. Debe ser una de: ${AREAS_PERMITIDAS.join(', ')}` });
-    if (nombre !== undefined && !esTextoValido(String(nombre), 2, 64)) return res.status(400).json({ error: 'El nombre debe tener entre 2 y 64 caracteres' });
+    if (nombre !== undefined && !esNombreTratamientoValido(String(nombre))) return res.status(400).json({ error: 'El nombre debe contener al menos 5 letras, puede incluir números y tener hasta 64 caracteres' });
     if (precio !== undefined && !esPrecioValido(precio)) return res.status(400).json({ error: 'El precio debe ser un número positivo (puede tener decimales)' });
     if (descripcion !== undefined && !esDescripcionValida(descripcion)) return res.status(400).json({ error: 'La descripción no debe exceder 300 caracteres' });
 
@@ -188,8 +215,8 @@ export const eliminarTratamientoController = async (req, res) => {
     const token = getTokenFromHeader(req);
     if (!token) return res.status(401).json({ error: 'Token no proporcionado' });
 
-    const isAdmin = await checkAdmin(token);
-    if (!isAdmin) return res.status(403).json({ error: 'Acceso denegado. Se requieren permisos de administrador' });
+    const perfilAdmin2 = await checkAdmin(token);
+    if (!perfilAdmin2) return res.status(403).json({ error: 'Acceso denegado. Se requieren permisos de administrador o superadmin' });
 
     const supabaseUser = getSupabaseClientWithToken(token);
     const { id } = req.params;

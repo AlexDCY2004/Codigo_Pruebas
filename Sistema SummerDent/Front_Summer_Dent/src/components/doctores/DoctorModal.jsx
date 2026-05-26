@@ -1,12 +1,4 @@
 import { useEffect, useState } from 'react';
-import {
-  sanitizeText,
-  sanitizePhone,
-  sanitizeEmail,
-  sanitizeAlpha,
-  validarEmail,
-  validarLongitud
-} from '../../utils/sanitize';
 
 const initialFormState = {
   nombre: '',
@@ -26,6 +18,7 @@ const ReadRow = ({ label, value }) => (
 export default function DoctorModal({ isOpen, onClose, onSubmit, initialData, isLoading, readOnly = false, externalErrors = {}, externalError = '' }) {
   const [formData, setFormData] = useState(initialFormState);
   const [errors, setErrors] = useState({});
+  const allErrors = { ...errors, ...externalErrors };
 
   useEffect(() => {
     let timer;
@@ -71,9 +64,8 @@ export default function DoctorModal({ isOpen, onClose, onSubmit, initialData, is
 
     if (!formData.nombre.trim()) {
       nextErrors.nombre = 'El nombre es obligatorio';
-    } else {
-      const nombreError = validarLongitud(formData.nombre, 2, 100, 'El nombre');
-      if (nombreError) nextErrors.nombre = nombreError;
+    } else if (!/^[A-Za-zÁÉÍÓÚáéíóúÑñ.\s]+$/.test(formData.nombre.trim())) {
+      nextErrors.nombre = 'El nombre solo debe contener letras, espacios o puntos';
     }
 
     if (!formData.telefono.trim()) {
@@ -82,19 +74,27 @@ export default function DoctorModal({ isOpen, onClose, onSubmit, initialData, is
       nextErrors.telefono = 'El teléfono solo debe contener números';
     } else if (formData.telefono.trim().length !== 10) {
       nextErrors.telefono = 'El teléfono debe tener 10 dígitos';
+    } else if (/(\d)\1{3,}/.test(formData.telefono.trim())) {
+      nextErrors.telefono = 'El teléfono no puede tener más de 3 dígitos iguales consecutivos';
     }
 
     if (!formData.correo.trim()) {
       nextErrors.correo = 'El correo es obligatorio';
     } else {
-      const correoError = validarEmail(formData.correo);
-      if (correoError) nextErrors.correo = correoError;
+      const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRe.test(formData.correo.trim())) nextErrors.correo = 'Ingrese un correo válido';
     }
 
     if (!formData.especialidad.trim()) {
       nextErrors.especialidad = 'La especialidad es obligatoria';
-    } else if (!/^[A-Za-zÁÉÍÓÚáéíóúÑñ\s]+$/.test(formData.especialidad.trim())) {
-      nextErrors.especialidad = 'La especialidad solo debe contener letras';
+    } else {
+      // Allow letters, spaces and commas, but not only commas/spaces
+      const raw = formData.especialidad.trim();
+      if (!/^[A-Za-zÁÉÍÓÚáéíóúÑñ,\s]+$/.test(raw)) {
+        nextErrors.especialidad = 'La especialidad solo debe contener letras y comas';
+      } else if (raw.replace(/[,\s]/g, '').length === 0) {
+        nextErrors.especialidad = 'La especialidad no puede contener solo comas';
+      }
     }
 
     setErrors(nextErrors);
@@ -104,27 +104,32 @@ export default function DoctorModal({ isOpen, onClose, onSubmit, initialData, is
   const handleChange = (event) => {
     const { name, value } = event.target;
 
-    let sanitized = value;
-    switch (name) {
-      case 'nombre':
-        sanitized = sanitizeText(value, 100);
-        break;
-      case 'telefono':
-        sanitized = sanitizePhone(value);
-        break;
-      case 'correo':
-        sanitized = sanitizeEmail(value, 100);
-        break;
-      case 'especialidad':
-        sanitized = sanitizeAlpha(value, 100);
-        break;
-      default:
-        break;
+    // For telefono only allow digits and max 10
+    if (name === 'telefono') {
+      if (!/^\d*$/.test(value) || value.length > 10) return;
+    }
+
+    // For nombre allow letters, spaces and dots only (sanitize as user types)
+    if (name === 'nombre') {
+      const sanitized = value.replace(/[^A-Za-zÁÉÍÓÚáéíóúÑñ.\s]/g, '');
+      setFormData((prev) => ({ ...prev, [name]: sanitized }));
+      if (errors[name]) {
+        setErrors((prev) => ({ ...prev, [name]: '' }));
+      }
+      return;
+    }
+
+    // For especialidad allow letters, spaces and commas only (sanitize as user types)
+    if (name === 'especialidad') {
+      const sanitized = value.replace(/[^A-Za-zÁÉÍÓÚáéíóúÑñ,\s]/g, '');
+      setFormData((prev) => ({ ...prev, [name]: sanitized }));
+      if (errors[name]) setErrors((prev) => ({ ...prev, [name]: '' }));
+      return;
     }
 
     setFormData((prev) => ({
       ...prev,
-      [name]: sanitized
+      [name]: value
     }));
 
     if (errors[name]) {
@@ -132,6 +137,16 @@ export default function DoctorModal({ isOpen, onClose, onSubmit, initialData, is
         ...prev,
         [name]: ''
       }));
+    }
+  };
+
+  const handlePaste = (e) => {
+    const name = e.target?.name;
+    if (name === 'telefono') {
+      const paste = (e.clipboardData || window.clipboardData).getData('text');
+      const digits = paste.replace(/\D/g, '').slice(0, 10);
+      e.preventDefault();
+      setFormData(prev => ({ ...prev, telefono: (String(prev.telefono || '') + digits).slice(0, 10) }));
     }
   };
 
@@ -159,7 +174,7 @@ export default function DoctorModal({ isOpen, onClose, onSubmit, initialData, is
           <button type="button" className="modal-close" onClick={onClose}>✕</button>
         </div>
 
-        <form onSubmit={handleSubmit} className={`doctor-form ${readOnly ? 'is-readonly' : ''}`}>
+        <form onSubmit={handleSubmit} noValidate className={`doctor-form ${readOnly ? 'is-readonly' : ''}`}>
           {!readOnly && externalError && (
             <div className="alert alert-error" style={{ marginBottom: '1rem' }}>
               {externalError}
@@ -198,10 +213,14 @@ export default function DoctorModal({ isOpen, onClose, onSubmit, initialData, is
                     type="text"
                     value={formData.telefono}
                     onChange={handleChange}
+                    onPaste={handlePaste}
                     placeholder="0991234567"
-                    className={errors.telefono ? 'input-error' : ''}
+                    className={allErrors.telefono ? 'input-error' : ''}
+                    maxLength={10}
+                    inputMode="numeric"
+                    aria-invalid={allErrors.telefono ? 'true' : 'false'}
                   />
-                  {errors.telefono && <span className="error-text">{errors.telefono}</span>}
+                  {allErrors.telefono && <span className="error-text">{allErrors.telefono}</span>}
                 </div>
 
                 <div className="form-group">
@@ -212,10 +231,12 @@ export default function DoctorModal({ isOpen, onClose, onSubmit, initialData, is
                     type="email"
                     value={formData.correo}
                     onChange={handleChange}
+                    onInvalid={(e) => e.preventDefault()}
                     placeholder="doctor@summerdent.com"
-                    className={errors.correo ? 'input-error' : ''}
+                    className={allErrors.correo ? 'input-error' : ''}
+                    aria-invalid={allErrors.correo ? 'true' : 'false'}
                   />
-                  {errors.correo && <span className="error-text">{errors.correo}</span>}
+                  {allErrors.correo && <span className="error-text">{allErrors.correo}</span>}
                 </div>
               </div>
 

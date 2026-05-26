@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { sanitizeText, sanitizeDecimal } from '../../utils/sanitize';
 
 const AREAS_PERMITIDAS = [
-  'Ortodoncia General',
+  'Odontología General',
   'Ortodoncia',
   'Ortopedia',
   'Cirugía Odontológica',
@@ -95,8 +94,16 @@ export default function TratamientoModal({
 
     if (!formData.nombre.trim()) {
       nextErrors.nombre = 'El nombre es obligatorio';
-    } else if (formData.nombre.trim().length < 2 || formData.nombre.trim().length > 64) {
-      nextErrors.nombre = 'El nombre debe tener entre 2 y 64 caracteres';
+    } else {
+      const limpio = formData.nombre.trim();
+      const letras = (limpio.match(/[A-Za-zÁÉÍÓÚáéíóúÑñ]/g) || []).length;
+      if (letras < 5) {
+        nextErrors.nombre = 'El nombre debe contener al menos 5 letras';
+      } else if (limpio.length > 64) {
+        nextErrors.nombre = 'El nombre no puede superar 64 caracteres';
+      } else if (!/^[A-Za-z0-9ÁÉÍÓÚáéíóúÑñ\s\-\.,]+$/.test(limpio)) {
+        nextErrors.nombre = 'El nombre contiene caracteres inválidos';
+      }
     }
 
     const precioRaw = String(formData.precio || '').trim();
@@ -104,14 +111,19 @@ export default function TratamientoModal({
 
     if (!precioRaw) {
       nextErrors.precio = 'El precio es obligatorio';
-    } else if (!/^\d+(\.\d{1,2})?$/.test(precioClean)) {
-      nextErrors.precio = 'El precio debe ser un número válido (hasta 2 decimales)';
+    } else if (!/^\d{1,4}(\.\d{1,2})?$/.test(precioClean)) {
+      nextErrors.precio = 'El precio puede tener hasta 4 dígitos y hasta 2 decimales';
     } else if (Number(precioClean) <= 0) {
       nextErrors.precio = 'El precio debe ser mayor a 0';
+    } else if (Number(precioClean) > 9999.99) {
+      nextErrors.precio = 'El precio no puede ser mayor a 9999.99';
     }
 
     if (formData.descripcion && formData.descripcion.length > 300) {
       nextErrors.descripcion = 'La descripción no puede superar 300 caracteres';
+    }
+    if (formData.descripcion && /@/.test(formData.descripcion)) {
+      nextErrors.descripcion = 'La descripción no puede contener el carácter "@"';
     }
 
     setErrors(nextErrors);
@@ -121,24 +133,20 @@ export default function TratamientoModal({
   const handleChange = (event) => {
     const { name, value } = event.target;
 
-    let sanitized = value;
-    switch (name) {
-      case 'nombre':
-        sanitized = sanitizeText(value, 64);
-        break;
-      case 'descripcion':
-        sanitized = sanitizeText(value, 300);
-        break;
-      case 'precio':
-        sanitized = sanitizeDecimal(value);
-        break;
-      default:
-        break;
+    // sanitize specific fields while typing
+    let nextValue = value;
+    if (name === 'nombre') {
+      // sanitize: remove '@' and other disallowed chars as user types
+      nextValue = value.replace(/[^A-Za-z0-9ÁÉÍÓÚáéíóúÑñ\s\-\.,]/g, '');
+    }
+    if (name === 'descripcion') {
+      // disallow the '@' character in descripcion
+      nextValue = value.replace(/@/g, '');
     }
 
     setFormData((prev) => ({
       ...prev,
-      [name]: sanitized
+      [name]: nextValue
     }));
 
     if (errors[name]) {
@@ -150,6 +158,25 @@ export default function TratamientoModal({
     if (serverError) clearServerError();
     if (serverFieldErrors && serverFieldErrors[name]) {
       clearServerFieldErrors(name);
+    }
+  };
+
+  const handlePaste = (event) => {
+    const { name } = event.target;
+    const paste = (event.clipboardData || window.clipboardData).getData('text') || '';
+    if (name === 'nombre' || name === 'descripcion') {
+      // Prevent raw paste and insert sanitized text (strip disallowed chars)
+      event.preventDefault();
+      const sanitized = paste.replace(/[^A-Za-z0-9ÁÉÍÓÚáéíóúÑñ\s\-\.,]/g, '');
+      setFormData((prev) => ({ ...prev, [name]: (prev[name] || '') + sanitized }));
+
+      if (errors[name]) {
+        setErrors((prev) => ({ ...prev, [name]: '' }));
+      }
+      if (serverError) clearServerError();
+      if (serverFieldErrors && serverFieldErrors[name]) {
+        clearServerFieldErrors(name);
+      }
     }
   };
 
@@ -189,7 +216,7 @@ export default function TratamientoModal({
           <button type="button" className="modal-close" onClick={onClose}>✕</button>
         </div>
 
-        <form className={`tratamiento-form ${readOnly ? 'tratamiento-form--readonly' : ''}`} onSubmit={handleSubmit}>
+        <form className={`tratamiento-form ${readOnly ? 'tratamiento-form--readonly' : ''}`} noValidate onSubmit={handleSubmit}>
           {serverError && (
             <div className="alert alert-error" style={{ marginBottom: '1rem' }}>
               {serverError}
@@ -218,6 +245,7 @@ export default function TratamientoModal({
                   name="area"
                   value={formData.area}
                   onChange={handleChange}
+                  onInvalid={(e) => e.preventDefault()}
                   className={errors.area ? 'input-error' : ''}
                 >
                   <option value="">Seleccionar área</option>
@@ -236,6 +264,8 @@ export default function TratamientoModal({
                   type="text"
                   value={formData.nombre}
                   onChange={handleChange}
+                  onPaste={handlePaste}
+                  onInvalid={(e) => e.preventDefault()}
                   placeholder="Limpieza Dental"
                   className={errors.nombre ? 'input-error' : ''}
                 />
@@ -253,6 +283,7 @@ export default function TratamientoModal({
                     min="0"
                     value={formData.precio}
                     onChange={handleChange}
+                    onInvalid={(e) => e.preventDefault()}
                     placeholder="0.00"
                     className={errors.precio ? 'input-error' : ''}
                   />
@@ -267,6 +298,8 @@ export default function TratamientoModal({
                     type="text"
                     value={formData.descripcion}
                     onChange={handleChange}
+                    onPaste={handlePaste}
+                    onInvalid={(e) => e.preventDefault()}
                     placeholder="Descripción del tratamiento"
                     className={errors.descripcion ? 'input-error' : ''}
                   />

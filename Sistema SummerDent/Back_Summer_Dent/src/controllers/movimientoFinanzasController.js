@@ -1,17 +1,22 @@
 import { getSupabaseClientWithToken, supabaseAdmin } from '../configuracionesDB/supabaseClient.js';
+import { getPerfilFromToken } from '../utils/perfilUtils.js';
+import { getAuthTokenFromReq } from '../utils/authUtils.js';
 
 const tipoPermitidos = ['ingreso', 'egreso'];
 const esEnteroPositivo = (v) => /^\d+$/.test(String(v || '').trim()) && Number(String(v).trim()) > 0;
 const esFechaValida = (f) => typeof f === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(f) && !Number.isNaN(new Date(`${f}T00:00:00`).getTime());
 const esDecimalPositivo = (m) => {
   if (m === undefined || m === null) return false;
-  const num = Number(String(m).trim());
+  const s = String(m).trim();
+  // Allow up to 5 integer digits and optional 1-2 decimals
+  if (!/^\d{1,5}(\.\d{1,2})?$/.test(s)) return false;
+  const num = Number(s);
   return Number.isFinite(num) && num > 0;
 };
 
 export const crearMovimientoController = async (req, res) => {
   try {
-    const token = (req.headers.authorization || '').startsWith('Bearer ') ? req.headers.authorization.replace('Bearer ', '').trim() : null;
+    const token = getAuthTokenFromReq(req);
     if (!token) return res.status(401).json({ error: 'Token no proporcionado' });
     const supabaseUser = getSupabaseClientWithToken(token);
 
@@ -39,6 +44,15 @@ export const crearMovimientoController = async (req, res) => {
       perfilId = null;
     }
 
+    // determinar sede según perfil o body (superadmin)
+    const perfil = await getPerfilFromToken(token);
+    let sedeToUse = null;
+    if (perfil && perfil.rol === 'superadmin') {
+      if (req.body && req.body.sede_id) sedeToUse = Number(req.body.sede_id);
+    } else if (perfil && perfil.sede_id) {
+      sedeToUse = perfil.sede_id;
+    }
+
     // Forzar id_perfil y usar fecha enviada (si viene válida), caso contrario usar hoy.
     // Use server local date (YYYY-MM-DD) to avoid timezone shifts from toISOString()
     const getLocalDateYYYYMMDD = () => {
@@ -60,6 +74,7 @@ export const crearMovimientoController = async (req, res) => {
       fecha: fechaSolicitada,
       created_at: new Date().toISOString()
     };
+    if (sedeToUse !== null) payload.sede_id = sedeToUse;
 
     const { data, error } = await supabaseUser.from('movimiento_finanzas').insert([payload]).select().maybeSingle();
     if (error) return res.status(400).json({ error: error.message || error });
@@ -87,7 +102,7 @@ export const crearMovimientoController = async (req, res) => {
 
 export const obtenerMovimientosController = async (req, res) => {
   try {
-    const token = (req.headers.authorization || '').startsWith('Bearer ') ? req.headers.authorization.replace('Bearer ', '').trim() : null;
+    const token = getAuthTokenFromReq(req);
     if (!token) return res.status(401).json({ error: 'Token no proporcionado' });
     const supabaseUser = getSupabaseClientWithToken(token);
 
@@ -104,6 +119,13 @@ export const obtenerMovimientosController = async (req, res) => {
     }
 
     let query = supabaseUser.from('movimiento_finanzas').select('*, doctor(*)');
+
+    // Filtrar por sede si se solicita (frontend enviará `sede_id` como query param)
+    const { sede_id: sedeQuery } = req.query || {};
+    if (sedeQuery !== undefined && sedeQuery !== null && String(sedeQuery).trim() !== '') {
+      const sid = Number(sedeQuery);
+      if (!Number.isNaN(sid)) query = query.eq('sede_id', sid);
+    }
 
     if (tipo) query = query.eq('tipo', String(tipo));
     if (id_doctor) query = query.eq('id_doctor', Number(id_doctor));
@@ -122,7 +144,7 @@ export const obtenerMovimientosController = async (req, res) => {
 
 export const obtenerMovimientoPorIdController = async (req, res) => {
   try {
-    const token = (req.headers.authorization || '').startsWith('Bearer ') ? req.headers.authorization.replace('Bearer ', '').trim() : null;
+    const token = getAuthTokenFromReq(req);
     if (!token) return res.status(401).json({ error: 'Token no proporcionado' });
     const supabaseUser = getSupabaseClientWithToken(token);
 
@@ -140,7 +162,7 @@ export const obtenerMovimientoPorIdController = async (req, res) => {
 
 export const actualizarMovimientoController = async (req, res) => {
   try {
-    const token = (req.headers.authorization || '').startsWith('Bearer ') ? req.headers.authorization.replace('Bearer ', '').trim() : null;
+    const token = getAuthTokenFromReq(req);
     if (!token) return res.status(401).json({ error: 'Token no proporcionado' });
     const supabaseUser = getSupabaseClientWithToken(token);
 
@@ -196,7 +218,7 @@ export const actualizarMovimientoController = async (req, res) => {
 
 export const eliminarMovimientoController = async (req, res) => {
   try {
-    const token = (req.headers.authorization || '').startsWith('Bearer ') ? req.headers.authorization.replace('Bearer ', '').trim() : null;
+    const token = getAuthTokenFromReq(req);
     if (!token) return res.status(401).json({ error: 'Token no proporcionado' });
     const supabaseUser = getSupabaseClientWithToken(token);
 

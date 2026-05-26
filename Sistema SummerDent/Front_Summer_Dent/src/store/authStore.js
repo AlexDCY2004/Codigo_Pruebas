@@ -1,15 +1,9 @@
 import { create } from 'zustand';
 
-const TOKEN_KEY = 'summerdent_access_token';
 const USER_KEY = 'summerdent_user';
+const SEDE_KEY = 'summerdent_sede_activa';
 
-const getStoredToken = () => {
-  try {
-    return localStorage.getItem(TOKEN_KEY) || '';
-  } catch {
-    return '';
-  }
-};
+const baseURL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
 
 const getStoredUser = () => {
   try {
@@ -20,44 +14,124 @@ const getStoredUser = () => {
   }
 };
 
+const getStoredSedeActiva = () => {
+  try {
+    const raw = localStorage.getItem(SEDE_KEY);
+    return raw ? Number(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
 export const useAuthStore = create((set) => ({
-  token: getStoredToken(),
+  token: '',
   user: getStoredUser(),
-  isAuthenticated: Boolean(getStoredToken()),
-  setSession: ({ token, user }) => {
-    const safeToken = token || '';
+  isAuthenticated: Boolean(getStoredUser()),
+  authReady: false,
+  sedeActiva: getStoredSedeActiva(),
+  setAuthReady: (ready) => set({ authReady: Boolean(ready) }),
+  setSession: ({ user }) => {
     const safeUser = user || null;
-
     try {
-      if (safeToken) {
-        localStorage.setItem(TOKEN_KEY, safeToken);
-      } else {
-        localStorage.removeItem(TOKEN_KEY);
-      }
-
       if (safeUser) {
         localStorage.setItem(USER_KEY, JSON.stringify(safeUser));
       } else {
         localStorage.removeItem(USER_KEY);
       }
-    } catch {
-      // Ignore storage errors to keep app usable in restricted environments.
+    } catch (e) {
+      void e; // Ignore storage errors to keep app usable in restricted environments.
+    }
+
+    // Default sedeActiva behavior:
+    // - administrador: fuerza su propia sede_id
+    // - superadmin: mantiene la sedeActiva almacenada o null
+    let sedeActivaToSet = null;
+    try {
+      const stored = getStoredSedeActiva();
+      if (safeUser && safeUser.rol === 'administrador') {
+        sedeActivaToSet = safeUser.sede_id ?? null;
+      } else {
+        sedeActivaToSet = stored ?? null;
+      }
+    } catch (e) {
+      void e;
+      sedeActivaToSet = null;
+    }
+
+    if (sedeActivaToSet !== null) {
+      try {
+        localStorage.setItem(SEDE_KEY, String(sedeActivaToSet));
+      } catch (e) {
+        void e;
+      }
+    } else {
+      try {
+        localStorage.removeItem(SEDE_KEY);
+      } catch (e) {
+        void e;
+      }
     }
 
     set({
-      token: safeToken,
+      token: '',
       user: safeUser,
-      isAuthenticated: Boolean(safeToken)
+      isAuthenticated: Boolean(safeUser),
+      authReady: true,
+      sedeActiva: sedeActivaToSet
     });
+  },
+  setSedeActiva: (sedeId) => {
+    try {
+      if (sedeId === null || typeof sedeId === 'undefined') {
+        localStorage.removeItem(SEDE_KEY);
+      } else {
+        localStorage.setItem(SEDE_KEY, String(sedeId));
+      }
+    } catch (e) {
+      void e; /* ignore */
+    }
+
+    set({ sedeActiva: sedeId ?? null });
+
+    // Notify other parts of the app and refresh so queries pick the new sede immediately.
+    try {
+      window.dispatchEvent(new CustomEvent('sedeChanged', { detail: sedeId ?? null }));
+    } catch (e) {
+      void e;
+    }
+
+    try {
+      // reload to force all pages to re-run their queries with the new sedeActiva
+      window.location.reload();
+    } catch (e) {
+      void e;
+    }
   },
   logout: () => {
     try {
-      localStorage.removeItem(TOKEN_KEY);
-      localStorage.removeItem(USER_KEY);
-    } catch {
-      // Ignore storage errors.
+      void fetch(`${baseURL}/api/auth/logout`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+    } catch (e) {
+      void e;
     }
 
-    set({ token: '', user: null, isAuthenticated: false });
+    try {
+      localStorage.removeItem(USER_KEY);
+    } catch (e) {
+      void e; // Ignore storage errors.
+    }
+
+    try {
+      localStorage.removeItem(SEDE_KEY);
+    } catch (e) {
+      void e;
+    }
+
+    set({ token: '', user: null, isAuthenticated: false, authReady: true, sedeActiva: null });
   }
 }));

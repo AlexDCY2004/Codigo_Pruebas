@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-import { sanitizeText } from '../../utils/sanitize';
 import ConfirmModal from '../../components/ui/ConfirmModal';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { createDoctor, deleteDoctor, fetchDoctores, updateDoctor } from '../../services/api/doctores';
@@ -160,7 +159,7 @@ export default function DoctoresPage() {
           className="search-input"
           placeholder="Buscar por nombre, teléfono, correo o especialidad..."
           value={searchTerm}
-          onChange={(event) => setSearchTerm(sanitizeText(event.target.value, 100))}
+          onChange={(event) => setSearchTerm(event.target.value)}
         />
       </div>
 

@@ -1,5 +1,6 @@
 import { DataTypes } from 'sequelize';
 import { sequelize } from '../configuracionesDB/database.js';
+import Sede from './sede.js';
 
 export const Paciente = sequelize.define(
     'Paciente',
@@ -52,6 +53,10 @@ export const Paciente = sequelize.define(
             type: DataTypes.STRING(255),
             allowNull: true
         },
+        sede_id: {
+            type: DataTypes.INTEGER,
+            allowNull: true
+        },
         created_at: {
             type: DataTypes.DATE,
             allowNull: false,
@@ -65,3 +70,6 @@ export const Paciente = sequelize.define(
 );
 
 export default Paciente;
+
+Paciente.belongsTo(Sede, { foreignKey: 'sede_id', as: 'sede' });
+Sede.hasMany(Paciente, { foreignKey: 'sede_id', as: 'pacientes' });

@@ -1,5 +1,7 @@
 import { Link, Outlet, useLocation } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import { useAuthStore } from '../../store/authStore';
+import apiClient from '../../services/api/client';
 import logoImage from '../../assets/Logo.png';
 
 const navItems = [
@@ -19,7 +21,7 @@ const Icon = ({ type }) => {
   if (type === 'users') return <svg {...common}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>;
   if (type === 'calendar') return <svg {...common}><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>;
   if (type === 'doctor') return <svg {...common}><circle cx="8" cy="7" r="4"/><path d="M3 21v-2a4 4 0 0 1 4-4h2"/><circle cx="17" cy="17" r="4"/><path d="M17 15v4"/><path d="M15 17h4"/></svg>;
-  if (type === 'pill') return <svg {...common}><path d="M10.5 13.5 18 6a4.2 4.2 0 1 0-6-6L4.5 7.5a4.2 4.2 0 1 0 6 6Z"/><path d="m8.5 5.5 10 10"/></svg>;
+  if (type === 'pill') return <svg {...common} viewBox="0 -2 24 28" style={{ transform: 'translateY(5px)' }}><path d="M10.5 13.5 18 6a4.2 4.2 0 1 0-6-6L4.5 7.5a4.2 4.2 0 1 0 6 6Z"/><path d="m8.5 5.5 10 10"/></svg>;
   if (type === 'trend-up') return <svg {...common}><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>;
   if (type === 'trend-down') return <svg {...common}><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>;
   if (type === 'chart') return <svg {...common}><path d="M21 12a9 9 0 1 1-9-9"/><path d="M21 3v9h-9"/></svg>;
@@ -31,6 +33,28 @@ export default function AppShell() {
   const location = useLocation();
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
+  const sedeActiva = useAuthStore((state) => state.sedeActiva);
+  const setSedeActiva = useAuthStore((state) => state.setSedeActiva);
+  const [sedes, setSedes] = useState([]);
+
+  useEffect(() => {
+    let mounted = true;
+    const fetchSedes = async () => {
+      if (user && user.rol === 'superadmin') {
+        try {
+          const { data } = await apiClient.get('/api/sedes');
+          if (mounted) setSedes(Array.isArray(data) ? data : []);
+        } catch {
+          if (mounted) setSedes([]);
+        }
+      }
+    };
+
+    fetchSedes();
+    return () => {
+      mounted = false;
+    };
+  }, [user]);
 
   return (
     <div className="app-shell">
@@ -67,12 +91,31 @@ export default function AppShell() {
             <img src={logoImage} alt="Logo Summer Dent" className="header-brand__logo" />
             <div>
               <h2>Summer Dent</h2>
+              {user && user.rol === 'superadmin' ? (
+                <div style={{ marginTop: 8 }}>
+                  <select
+                      className={`seg-btn seg-btn--sede is-active`}
+                      value={sedeActiva ?? ''}
+                      onChange={(e) => setSedeActiva(e.target.value ? Number(e.target.value) : null)}
+                    >
+                    <option value="">Todas las sedes</option>
+                    {sedes
+                      .filter((s) => ['Sede Quito', 'Sede El Carmen'].includes(s.nombre))
+                      .map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.nombre}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              ) : null}
             </div>
           </div>
           <div className="header-user-block">
             <div className="header-user-info">
               <span>{user?.nombre || 'Secretaria Principal'}</span>
             </div>
+            {null}
             <button type="button" onClick={logout} className="logout-btn">
               Cerrar sesión
             </button>

@@ -1,15 +1,4 @@
-import { useState, useEffect } from 'react';
-import {
-  sanitizeCedula,
-  sanitizeAlpha,
-  sanitizePhone,
-  sanitizeEmail,
-  sanitizeAddress,
-  validarCedulaEcuatoriana,
-  validarEmail,
-  validarLongitud,
-  validarFechaNoFutura
-} from '../../utils/sanitize';
+import { useState} from 'react';
 
 const getInitialFormData = (initialData) => ({
   id_cedula: initialData?.id_cedula || '',
@@ -30,77 +19,53 @@ function ReadRow({ label, value }) {
   );
 }
 
-export default function PacienteModal({ isOpen, onClose, onSubmit, initialData, isLoading, readOnly = false, isEditing = false, externalErrors = {} }) {
+export default function PacienteModal({ isOpen, onClose, onSubmit, initialData, isLoading, readOnly = false, isEditing = false, externalErrors = {}, onClearExternalError }) {
   const [formData, setFormData] = useState(() => getInitialFormData(initialData));
-
-  // Reset when modal opens/closes or initialData changes
-  useEffect(() => {
-    setFormData(getInitialFormData(initialData));
-    setErrors({});
-  }, [initialData, isOpen]);
-
-  // Merge external/server-side field errors into local errors
-  useEffect(() => {
-    if (externalErrors && Object.keys(externalErrors).length > 0) {
-      setErrors(prev => ({ ...prev, ...externalErrors }));
-    }
-  }, [externalErrors]);
-
   const [errors, setErrors] = useState({});
-
+  const allErrors = { ...errors, ...externalErrors };
+  
   const validateForm = () => {
     const newErrors = {};
-    
-    // Cédula: validación ecuatoriana completa
-    const cedulaError = validarCedulaEcuatoriana(formData.id_cedula);
-    if (cedulaError) newErrors.id_cedula = cedulaError;
 
-    // Nombre
-    const nombreError = validarLongitud(formData.nombre, 2, 50, 'El nombre');
+    if (!formData.id_cedula?.trim()) {
+      newErrors.id_cedula = 'Cédula requerida';
+    } else if (formData.id_cedula.trim().length !== 10) {
+      newErrors.id_cedula = 'La cédula debe tener 10 dígitos';
+    }
+
     if (!formData.nombre?.trim()) newErrors.nombre = 'Nombre requerido';
-    else if (nombreError) newErrors.nombre = nombreError;
-
-    // Apellido
-    const apellidoError = validarLongitud(formData.apellido, 2, 50, 'El apellido');
     if (!formData.apellido?.trim()) newErrors.apellido = 'Apellido requerido';
-    else if (apellidoError) newErrors.apellido = apellidoError;
 
-    // Fecha de nacimiento
+    // Fecha de nacimiento: requerida y al menos 2 años, máximo 60
     if (!formData.fecha_nacimiento) {
       newErrors.fecha_nacimiento = 'Fecha de nacimiento requerida';
     } else {
-      const fechaError = validarFechaNoFutura(formData.fecha_nacimiento);
-      if (fechaError) {
-        newErrors.fecha_nacimiento = fechaError;
+      const d = new Date(formData.fecha_nacimiento);
+      if (Number.isNaN(d.getTime())) {
+        newErrors.fecha_nacimiento = 'Fecha de nacimiento inválida';
       } else {
-        // Validar que la fecha no sea mayor a 110 años atrás
-        const hoy = new Date();
-        const minDate = new Date(hoy.getFullYear() - 110, hoy.getMonth(), hoy.getDate());
-        const fechaNac = new Date(formData.fecha_nacimiento + 'T00:00:00');
-        if (fechaNac < minDate) {
-          newErrors.fecha_nacimiento = 'La fecha de nacimiento no puede ser mayor a 110 años atrás';
-        }
+        const now = new Date();
+        let age = now.getFullYear() - d.getFullYear();
+        const m = now.getMonth() - d.getMonth();
+        if (m < 0 || (m === 0 && now.getDate() < d.getDate())) age--;
+        if (age < 2) newErrors.fecha_nacimiento = 'El paciente debe tener al menos 2 años. No se admite fechas futuras';
+        else if (age > 60) newErrors.fecha_nacimiento = 'La edad debe ser menor o igual a 60 años';
       }
     }
 
-    // Teléfono (opcional, pero si se ingresa debe ser 10 dígitos)
-    if (formData.telefono?.trim()) {
-      if (!/^\d{10}$/.test(formData.telefono.trim())) {
-        newErrors.telefono = 'El teléfono debe tener exactamente 10 dígitos';
-      }
+    // Correo: si existe, debe ser válido (mostrar error en UI en vez de tooltip nativo)
+    if (formData.correo) {
+      const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRe.test(formData.correo)) newErrors.correo = 'Ingrese un correo válido.';
     }
 
-    // Correo (opcional, pero si se ingresa debe ser válido)
-    if (formData.correo?.trim()) {
-      const correoError = validarEmail(formData.correo);
-      if (correoError) newErrors.correo = correoError;
+    // Teléfono: opcional, pero si está presente debe tener 10 dígitos y no permitir 4 o más dígitos iguales consecutivos
+    if (formData.telefono) {
+      const tel = String(formData.telefono).trim();
+      if (!/^\d{10}$/.test(tel)) newErrors.telefono = 'El teléfono debe contener solo 10 dígitos';
+      else if (/(\d)\1{3,}/.test(tel)) newErrors.telefono = 'El teléfono no puede tener más de 3 dígitos iguales consecutivos';
     }
 
-    // Dirección (opcional, solo limitar longitud)
-    if (formData.direccion && formData.direccion.length > 255) {
-      newErrors.direccion = 'La dirección no puede superar 255 caracteres';
-    }
-    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -108,38 +73,29 @@ export default function PacienteModal({ isOpen, onClose, onSubmit, initialData, 
   const handleChange = (e) => {
     if (readOnly) return;
     const { name, value } = e.target;
-
-    let sanitized = value;
-    switch (name) {
-      case 'id_cedula':
-        sanitized = sanitizeCedula(value);
-        break;
-      case 'nombre':
-      case 'apellido':
-        sanitized = sanitizeAlpha(value, 50);
-        break;
-      case 'telefono':
-        sanitized = sanitizePhone(value);
-        break;
-      case 'correo':
-        sanitized = sanitizeEmail(value, 100);
-        break;
-      case 'direccion':
-        sanitized = sanitizeAddress(value, 255);
-        break;
-      default:
-        break;
+    
+    if (name === 'id_cedula' || name === 'telefono') {
+      if (!/^\d*$/.test(value) || value.length > 10) return; // solo números, máx 10
     }
-
-    setFormData(prev => ({
-      ...prev,
-      [name]: sanitized
-    }));
+    
+    setFormData(prev => ({ ...prev, [name]: value }));
     if (errors[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }));
+      setErrors(prev => ({ ...prev, [name]: '' }));
+    }
+    if (externalErrors[name]) {
+      onClearExternalError(name);
+    }
+  };
+
+  const handlePaste = (e) => {
+    if (readOnly) return;
+    const name = e.target?.name;
+    if (name === 'id_cedula' || name === 'telefono') {
+      const paste = (e.clipboardData || window.clipboardData).getData('text');
+      const digits = paste.replace(/\D/g, '').slice(0, 10);
+      e.preventDefault();
+      setFormData(prev => ({ ...prev, [name]: (String(prev[name] || '') + digits).slice(0, 10) }));
+      if (externalErrors[name]) onClearExternalError(name);
     }
   };
 
@@ -160,7 +116,7 @@ export default function PacienteModal({ isOpen, onClose, onSubmit, initialData, 
           <h2>{readOnly ? 'Ver Paciente' : (initialData?.id_cedula ? 'Editar Paciente' : 'Nuevo Paciente')}</h2>
           <button type="button" className="modal-close" onClick={onClose}>✕</button>
         </div>
-        <form onSubmit={handleSubmit} className={`patient-form ${readOnly ? 'is-readonly' : ''}`}>
+        <form onSubmit={handleSubmit} noValidate className={`patient-form ${readOnly ? 'is-readonly' : ''}`}>
           {readOnly ? (
             <>
               <ReadRow label="Cédula:" value={formData.id_cedula} />
@@ -179,7 +135,7 @@ export default function PacienteModal({ isOpen, onClose, onSubmit, initialData, 
                     value={formData.id_cedula}
                     onChange={handleChange}
                     placeholder="1234567890"
-                    className={errors.id_cedula ? 'input-error' : ''}
+                    className={allErrors.id_cedula ? 'input-error' : ''}
                     disabled
                   />
                 ) : (
@@ -189,11 +145,15 @@ export default function PacienteModal({ isOpen, onClose, onSubmit, initialData, 
                     name="id_cedula"
                     value={formData.id_cedula}
                     onChange={handleChange}
+                    onPaste={handlePaste}
                     placeholder="1234567890"
-                    className={errors.id_cedula ? 'input-error' : ''}
+                    className={allErrors.id_cedula ? 'input-error' : ''}
+                    maxLength={10}
+                    inputMode="numeric"
+                    aria-invalid={allErrors.id_cedula ? 'true' : 'false'}
                   />
                 )}
-                {errors.id_cedula && <span className="error-text">{errors.id_cedula}</span>}
+                {allErrors.id_cedula && <span className="error-text">{allErrors.id_cedula}</span>}
               </div>
 
               <div className="form-row">
@@ -206,9 +166,9 @@ export default function PacienteModal({ isOpen, onClose, onSubmit, initialData, 
                     value={formData.nombre}
                     onChange={handleChange}
                     placeholder="Juan"
-                    className={errors.nombre ? 'input-error' : ''}
+                    className={allErrors.nombre ? 'input-error' : ''}
                   />
-                  {errors.nombre && <span className="error-text">{errors.nombre}</span>}
+                  {allErrors.nombre && <span className="error-text">{allErrors.nombre}</span>}
                 </div>
                 <div className="form-group">
                   <label htmlFor="apellido">Apellido *</label>
@@ -219,9 +179,9 @@ export default function PacienteModal({ isOpen, onClose, onSubmit, initialData, 
                     value={formData.apellido}
                     onChange={handleChange}
                     placeholder="Pérez"
-                    className={errors.apellido ? 'input-error' : ''}
+                    className={allErrors.apellido ? 'input-error' : ''}
                   />
-                  {errors.apellido && <span className="error-text">{errors.apellido}</span>}
+                  {allErrors.apellido && <span className="error-text">{allErrors.apellido}</span>}
                 </div>
               </div>
             </>
@@ -244,9 +204,9 @@ export default function PacienteModal({ isOpen, onClose, onSubmit, initialData, 
                   name="fecha_nacimiento"
                   value={formData.fecha_nacimiento}
                   onChange={handleChange}
-                  className={errors.fecha_nacimiento ? 'input-error' : ''}
+                  className={allErrors.fecha_nacimiento ? 'input-error' : ''}
                 />
-                {errors.fecha_nacimiento && <span className="error-text">{errors.fecha_nacimiento}</span>}
+                {allErrors.fecha_nacimiento && <span className="error-text">{allErrors.fecha_nacimiento}</span>}
               </div>
 
               <div className="form-row">
@@ -258,8 +218,14 @@ export default function PacienteModal({ isOpen, onClose, onSubmit, initialData, 
                     name="telefono"
                     value={formData.telefono}
                     onChange={handleChange}
+                    onPaste={handlePaste}
                     placeholder="0991234567"
+                    className={allErrors.telefono ? 'input-error' : ''}
+                    maxLength={10}
+                    inputMode="numeric"
+                    aria-invalid={allErrors.telefono ? 'true' : 'false'}
                   />
+                  {allErrors.telefono && <span className="error-text">{allErrors.telefono}</span>}
                 </div>
                 <div className="form-group">
                   <label htmlFor="correo">Correo</label>
@@ -269,8 +235,12 @@ export default function PacienteModal({ isOpen, onClose, onSubmit, initialData, 
                     name="correo"
                     value={formData.correo}
                     onChange={handleChange}
+                    onInvalid={(e) => e.preventDefault()}
                     placeholder="email@example.com"
+                    className={allErrors.correo ? 'input-error' : ''}
+                    aria-invalid={allErrors.correo ? 'true' : 'false'}
                   />
+                  {allErrors.correo && <span className="error-text">{allErrors.correo}</span>}
                 </div>
               </div>
 
@@ -283,7 +253,9 @@ export default function PacienteModal({ isOpen, onClose, onSubmit, initialData, 
                   value={formData.direccion}
                   onChange={handleChange}
                   placeholder="Av. Principal 123"
+                  className={allErrors.direccion ? 'input-error' : ''}
                 />
+                {allErrors.direccion && <span className="error-text">{allErrors.direccion}</span>}
               </div>
             </>
           )}

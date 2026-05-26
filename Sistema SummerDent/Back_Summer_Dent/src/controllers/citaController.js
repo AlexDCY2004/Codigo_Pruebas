@@ -1,4 +1,6 @@
 import { getSupabaseClientWithToken, supabase, supabaseAdmin } from '../configuracionesDB/supabaseClient.js';
+import { getPerfilFromToken } from '../utils/perfilUtils.js';
+import { getAuthTokenFromReq } from '../utils/authUtils.js';
 
 const estadosPermitidos = ['agendada', 'confirmada', 'Atendida', 'cancelada'];
 
@@ -53,7 +55,7 @@ const obtenerPerfilIdAutenticado = async (token, supabaseUser) => {
 
 export const crearCitaController = async (req, res) => {
   try {
-    const token = (req.headers.authorization || '').startsWith('Bearer ') ? req.headers.authorization.replace('Bearer ', '').trim() : null;
+    const token = getAuthTokenFromReq(req);
     if (!token) return res.status(401).json({ error: 'Token no proporcionado' });
     const supabaseUser = getSupabaseClientWithToken(token);
 
@@ -78,16 +80,6 @@ export const crearCitaController = async (req, res) => {
     }
     if (!esFechaValida(fecha)) return res.status(400).json({ error: 'fecha inválida, formato YYYY-MM-DD' });
     if (!esHoraValida(hora_inicio) || !esHoraValida(hora_fin)) return res.status(400).json({ error: 'hora_inicio/hora_fin inválida, formato HH:MM ó HH:MM:SS' });
-    // Horario de atención: 08:00 – 20:00
-    if (String(hora_inicio) < '08:00' || String(hora_inicio) >= '20:00') return res.status(400).json({ error: 'hora_inicio fuera del horario de atención (08:00 – 20:00)' });
-    if (String(hora_fin) > '20:00' || String(hora_fin) <= '08:00') return res.status(400).json({ error: 'hora_fin fuera del horario de atención (08:00 – 20:00)' });
-    if (String(hora_inicio) >= String(hora_fin)) return res.status(400).json({ error: 'hora_fin debe ser posterior a hora_inicio' });
-    // Duración máxima: 2 horas
-    {
-      const [hi, mi] = String(hora_inicio).split(':').map(Number);
-      const [hf, mf] = String(hora_fin).split(':').map(Number);
-      if ((hf * 60 + mf) - (hi * 60 + mi) > 120) return res.status(400).json({ error: 'La duración máxima de una cita es de 2 horas' });
-    }
     if (estado !== undefined && estado !== null && !estadosPermitidos.includes(String(estado))) return res.status(400).json({ error: `estado inválido. Debe ser: ${estadosPermitidos.join(', ')}` });
 
     // Verificar que paciente, doctor y tratamiento (si aplica) existen — RLS aplica
@@ -120,6 +112,8 @@ export const crearCitaController = async (req, res) => {
       precioCalculado = Number(tratExist.precio || 0);
     }
 
+    const perfil = await getPerfilFromToken(token);
+
     const insertObj = {
       id_paciente: String(id_paciente).trim(),
       id_doctor: Number(id_doctor),
@@ -131,6 +125,12 @@ export const crearCitaController = async (req, res) => {
       precio: typeof precio !== 'undefined' && precio !== null ? precio : (precioCalculado !== null ? precioCalculado : 0),
       estado: estado ? String(estado) : 'agendada'
     };
+    // asignar sede_id: administrador -> su sede; superadmin puede enviar sede_id en body
+    if (perfil && perfil.rol === 'superadmin') {
+      if (req.body && req.body.sede_id) insertObj.sede_id = Number(req.body.sede_id);
+    } else if (perfil && perfil.sede_id) {
+      insertObj.sede_id = perfil.sede_id;
+    }
 
     const { data, error } = await supabaseUser.from('cita').insert([insertObj]).select().maybeSingle();
     if (error) return res.status(400).json({ error: error.message || error });
@@ -212,7 +212,7 @@ export const crearCitaController = async (req, res) => {
 
 export const obtenerCitasController = async (req, res) => {
   try {
-    const token = (req.headers.authorization || '').startsWith('Bearer ') ? req.headers.authorization.replace('Bearer ', '').trim() : null;
+    const token = getAuthTokenFromReq(req);
     if (!token) return res.status(401).json({ error: 'Token no proporcionado' });
     const supabaseUser = getSupabaseClientWithToken(token);
 
@@ -237,6 +237,13 @@ export const obtenerCitasController = async (req, res) => {
       query = query.eq('estado', String(estado));
     }
 
+    // permitir filtrado por sede desde frontend (sedeActiva)
+    const { sede_id: sedeQuery } = req.query || {};
+    if (sedeQuery !== undefined && sedeQuery !== null && String(sedeQuery).trim() !== '') {
+      const sid = Number(sedeQuery);
+      if (!Number.isNaN(sid)) query = query.eq('sede_id', sid);
+    }
+
     const { data, error } = await query.order('fecha', { ascending: false }).order('hora_inicio', { ascending: false });
     if (error) return res.status(500).json({ error: error.message || error });
 
@@ -248,7 +255,7 @@ export const obtenerCitasController = async (req, res) => {
 
 export const obtenerCitaPorIdController = async (req, res) => {
   try {
-    const token = (req.headers.authorization || '').startsWith('Bearer ') ? req.headers.authorization.replace('Bearer ', '').trim() : null;
+    const token = getAuthTokenFromReq(req);
     if (!token) return res.status(401).json({ error: 'Token no proporcionado' });
     const supabaseUser = getSupabaseClientWithToken(token);
 
@@ -271,7 +278,7 @@ export const obtenerCitaPorIdController = async (req, res) => {
 
 export const actualizarCitaController = async (req, res) => {
   try {
-    const token = (req.headers.authorization || '').startsWith('Bearer ') ? req.headers.authorization.replace('Bearer ', '').trim() : null;
+    const token = getAuthTokenFromReq(req);
     if (!token) return res.status(401).json({ error: 'Token no proporcionado' });
     const supabaseUser = getSupabaseClientWithToken(token);
 
@@ -291,6 +298,9 @@ export const actualizarCitaController = async (req, res) => {
     const { data: existing, error: fetchErr } = await supabaseUser.from('cita').select('id, estado, precio, id_doctor, tratamientos, id_perfil').eq('id', Number(id)).maybeSingle();
     if (fetchErr) return res.status(500).json({ error: fetchErr.message || fetchErr });
     if (!existing) return res.status(404).json({ error: 'Cita no encontrada' });
+    if (String(existing.estado || '').toLowerCase() === 'atendida') {
+      return res.status(409).json({ error: 'La cita ya fue atendida y no puede editarse.' });
+    }
 
     const perfilId = await obtenerPerfilIdAutenticado(token, supabaseUser);
 
@@ -309,6 +319,9 @@ export const actualizarCitaController = async (req, res) => {
       if (!esEnteroPositivo(id_doctor)) return res.status(400).json({ error: 'id_doctor inválido' });
       updates.id_doctor = Number(id_doctor);
     }
+    const precioExplicito = precio !== undefined && precio !== null && String(precio).trim() !== '';
+    const precioFinalExplicito = precioExplicito ? Number(precio) : null;
+
     if (tratamientos !== undefined) {
       if (!Array.isArray(tratamientos)) return res.status(400).json({ error: 'tratamientos debe ser un arreglo de IDs' });
       if (tratamientos.length === 0) return res.status(400).json({ error: 'El arreglo tratamientos no puede estar vacío' });
@@ -322,8 +335,11 @@ export const actualizarCitaController = async (req, res) => {
         const faltantes = ids.filter((x) => !encontrados.includes(x));
         return res.status(404).json({ error: `Tratamientos no encontrados: ${faltantes.join(', ')}` });
       }
-      const total = tratamientosData.reduce((s, t) => s + Number(t.precio || 0), 0);
-      updates.precio = total;
+      // Solo calcular automáticamente el monto si el cliente no envía un valor explícito.
+      if (!precioExplicito) {
+        const total = tratamientosData.reduce((s, t) => s + Number(t.precio || 0), 0);
+        updates.precio = total;
+      }
       // Do not write `id_tratamiento` directly on `cita` because some DB
       // schemas do not include that column. Use the `cita_tratamiento`
       // relation table to store treatments (handled below).
@@ -335,29 +351,17 @@ export const actualizarCitaController = async (req, res) => {
     }
     if (hora_inicio !== undefined) {
       if (!esHoraValida(hora_inicio)) return res.status(400).json({ error: 'hora_inicio inválida' });
-      if (String(hora_inicio) < '08:00' || String(hora_inicio) >= '20:00') return res.status(400).json({ error: 'hora_inicio fuera del horario de atención (08:00 – 20:00)' });
       updates.hora_inicio = String(hora_inicio);
     }
     if (hora_fin !== undefined) {
       if (!esHoraValida(hora_fin)) return res.status(400).json({ error: 'hora_fin inválida' });
-      if (String(hora_fin) > '20:00' || String(hora_fin) <= '08:00') return res.status(400).json({ error: 'hora_fin fuera del horario de atención (08:00 – 20:00)' });
       updates.hora_fin = String(hora_fin);
     }
-    // Validar orden y duración máxima usando los valores finales (existentes + actualizados)
-    {
-      const finalInicio = updates.hora_inicio || existing.hora_inicio;
-      const finalFin = updates.hora_fin || existing.hora_fin;
-      if (finalInicio && finalFin) {
-        if (String(finalInicio) >= String(finalFin)) return res.status(400).json({ error: 'hora_fin debe ser posterior a hora_inicio' });
-        const [hi, mi] = String(finalInicio).split(':').map(Number);
-        const [hf, mf] = String(finalFin).split(':').map(Number);
-        if ((hf * 60 + mf) - (hi * 60 + mi) > 120) return res.status(400).json({ error: 'La duración máxima de una cita es de 2 horas' });
-      }
-    }
-    if (precio !== undefined) {
-      const p = Number(precio);
-      if (Number.isNaN(p) || p < 0) return res.status(400).json({ error: 'precio inválido' });
-      updates.precio = p;
+    // El precio explícito del formulario tiene prioridad sobre la sumatoria de tratamientos.
+    // Si no viene precio, entonces se conserva el cálculo automático.
+    if (precioExplicito) {
+      if (Number.isNaN(precioFinalExplicito) || precioFinalExplicito < 0) return res.status(400).json({ error: 'precio inválido' });
+      updates.precio = precioFinalExplicito;
     }
     if (estado !== undefined) {
       if (!estadosPermitidos.includes(String(estado))) return res.status(400).json({ error: `estado inválido. Debe ser: ${estadosPermitidos.join(', ')}` });
@@ -434,6 +438,12 @@ export const actualizarCitaController = async (req, res) => {
               fecha: todayLocal,
               created_at: new Date().toISOString()
             };
+            // Asignar sede si está disponible en la cita o en el perfil
+            try {
+              const sedeFromData = data && data.sede_id ? data.sede_id : null;
+              if (sedeFromData) createObj.sede_id = sedeFromData;
+              else if (perfil && perfil.sede_id) createObj.sede_id = perfil.sede_id;
+            } catch (e) {}
             await finClient.from('movimiento_finanzas').insert([createObj]);
           } catch (e) {
             // no bloquear flujo principal
@@ -479,7 +489,21 @@ export const actualizarCitaController = async (req, res) => {
       }
     }
 
-    return res.json({ mensaje: 'Cita actualizada', cita: data });
+    // Reaplicar el monto explícito al final por si alguna lógica de BD ajusta la cita
+    // después de sincronizar las relaciones de tratamientos.
+    if (precioExplicito && Number.isFinite(precioFinalExplicito)) {
+      const { error: finalPrecioErr } = await dbClient
+        .from('cita')
+        .update({ precio: precioFinalExplicito })
+        .eq('id', Number(id));
+      if (finalPrecioErr) return res.status(500).json({ error: finalPrecioErr.message || finalPrecioErr });
+    }
+
+    const citaRespuesta = precioExplicito && Number.isFinite(precioFinalExplicito)
+      ? { ...data, precio: precioFinalExplicito }
+      : data;
+
+    return res.json({ mensaje: 'Cita actualizada', cita: citaRespuesta });
   } catch (error) {
     return res.status(500).json({ error: error.message || error });
   }
@@ -487,7 +511,7 @@ export const actualizarCitaController = async (req, res) => {
 
 export const eliminarCitaController = async (req, res) => {
   try {
-    const token = (req.headers.authorization || '').startsWith('Bearer ') ? req.headers.authorization.replace('Bearer ', '').trim() : null;
+    const token = getAuthTokenFromReq(req);
     if (!token) return res.status(401).json({ error: 'Token no proporcionado' });
     const supabaseUser = getSupabaseClientWithToken(token);
 

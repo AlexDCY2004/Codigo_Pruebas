@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
-import { sanitizeText, sanitizeDigits } from '../../utils/sanitize';
 import ConfirmModal from '../../components/ui/ConfirmModal';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchProductos, updateProducto, createProducto } from '../../services/api/productos';
+import { createMovimientoFinanzas } from '../../services/api/movimientoFinanzas';
 import { fetchInventarios, registrarMovimientoInventario } from '../../services/api/inventario';
 import ErrorState from '../../components/feedback/ErrorState';
 import InventarioModal from '../../components/inventario/InventarioModal';
@@ -39,6 +39,14 @@ const formatCurrency = (value) => {
   // normalize to 2 decimals to avoid floating point artifacts (e.g. 19.9999999)
   const num = Math.round(raw * 100) / 100;
   return new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD' }).format(num);
+};
+
+const getLocalDateYYYYMMDD = () => {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 };
 
 /*const toDateInputValue = (value) => {
@@ -115,11 +123,27 @@ export default function InventarioPage() {
   const [pendingMovementQty, setPendingMovementQty] = useState(0);
   const [movementIsSaving, setMovementIsSaving] = useState(false);
   const [movementError, setMovementError] = useState('');
-  const [movementShowPayment, setMovementShowPayment] = useState(false);
+  const [movementAction, setMovementAction] = useState('choice');
+  const [movementMontoCompra, setMovementMontoCompra] = useState('');
   const [movementMetodoPago, setMovementMetodoPago] = useState('efectivo');
   const [movementDetallePago, setMovementDetallePago] = useState('');
-  const [movementPaymentErrors, setMovementPaymentErrors] = useState({});
-  const [movementConfirmingSale, setMovementConfirmingSale] = useState(false);
+  const [movementFieldErrors, setMovementFieldErrors] = useState({});
+
+  const resetMovementForm = () => {
+    setPendingMovementQty(1);
+    setMovementAction('choice');
+    setMovementMontoCompra('');
+    setMovementMetodoPago('efectivo');
+    setMovementDetallePago('');
+    setMovementFieldErrors({});
+    setMovementError('');
+  };
+
+  const closeMovementModal = () => {
+    setMovementConfirmOpen(false);
+    setPendingMovementInventario(null);
+    resetMovementForm();
+  };
 
   const { data: inventarios = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['inventario'],
@@ -182,10 +206,8 @@ export default function InventarioPage() {
   };
 
   const handleRegisterMovement = async (inventario) => {
-    // Open in-modal quantity input instead of native prompt
     setPendingMovementInventario(inventario);
-    setPendingMovementQty(1);
-    setMovementError('');
+    resetMovementForm();
     setMovementConfirmOpen(true);
   };
 
@@ -196,27 +218,36 @@ export default function InventarioPage() {
       const qty = Number(pendingMovementQty);
       if (!Number.isFinite(qty) || qty <= 0) throw new Error('Cantidad inválida');
 
+      const normalizedType = String(type);
       const payload = {
         id_producto: pendingMovementInventario.id_producto,
-        tipo_movimiento: type,
-        cantidad: Math.floor(qty)
+        tipo_movimiento: normalizedType,
+        cantidad: Math.floor(qty),
+        fecha: getLocalDateYYYYMMDD()
       };
-      if (type === 'salida' && movementMetodoPago) {
+
+      if (normalizedType === 'entrada') {
+        const montoCompra = Number(movementMontoCompra);
+        if (!Number.isFinite(montoCompra) || montoCompra <= 0) {
+          throw new Error('El valor de la compra es obligatorio y debe ser mayor a 0');
+        }
+        payload.monto = Number(montoCompra.toFixed(2));
+        payload.metodo_pago = movementMetodoPago || 'efectivo';
+        if (movementDetallePago) payload.detalle_pago = movementDetallePago;
+      }
+
+      if (normalizedType === 'salida' && movementMetodoPago) {
         payload.metodo_pago = movementMetodoPago;
         if (movementDetallePago) payload.detalle_pago = movementDetallePago;
       }
 
       await registrarMovimientoInventario(payload);
-      // After movement, refresh cache from server so DB timestamps are authoritative
       queryClient.invalidateQueries({ queryKey: ['inventario'] });
+      queryClient.invalidateQueries({ queryKey: ['egresos'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-snapshot'] });
       setMovementConfirmOpen(false);
       setPendingMovementInventario(null);
-      setPendingMovementQty(0);
-      setMovementShowPayment(false);
-      setMovementMetodoPago('efectivo');
-      setMovementDetallePago('');
-      setMovementPaymentErrors({});
-      setMovementConfirmingSale(false);
+      resetMovementForm();
     } catch (error) {
       const raw = error.response?.data?.error || error.message || '';
       setMovementError(raw || 'No se pudo registrar el movimiento.');
@@ -238,7 +269,8 @@ export default function InventarioPage() {
           categoria: payload.categoria || null,
           stock_producto: payload.stock_producto !== undefined ? payload.stock_producto : 0,
           stock_minimo: payload.stock_minimo !== undefined ? payload.stock_minimo : 0,
-          precio: payload.precio !== undefined && payload.precio !== '' ? Number(payload.precio).toFixed(2) : 0
+          precio: payload.precio !== undefined && payload.precio !== '' ? Number(payload.precio).toFixed(2) : 0,
+          fecha_caducidad: payload.fecha_caducidad
         };
 
         const res = await createProducto(createPayload);
@@ -246,11 +278,12 @@ export default function InventarioPage() {
         const createdProductId = res?.producto?.id || res?.inventario?.id_producto || res?.producto?.id_producto;
 
         if (payload.registrarMovimiento && createdProductId) {
-          await registrarMovimientoInventario({
-            id_producto: createdProductId,
-            tipo_movimiento: payload.tipo_movimiento,
-            cantidad: payload.cantidad
-          });
+            await registrarMovimientoInventario({
+              id_producto: createdProductId,
+              tipo_movimiento: payload.tipo_movimiento,
+              cantidad: payload.cantidad,
+              fecha: getLocalDateYYYYMMDD()
+            });
         }
       } else {
         const productId = payload.id_producto;
@@ -266,17 +299,47 @@ export default function InventarioPage() {
           categoria: payload.categoria ?? productData.categoria ?? null,
           precio: payload.precio !== undefined && payload.precio !== '' ? Number(payload.precio).toFixed(2) : (productData.precio ?? 0),
           stock_producto: payload.stock_producto,
-          stock_minimo: payload.stock_minimo
+          stock_minimo: payload.stock_minimo,
+          fecha_caducidad: payload.fecha_caducidad
         };
         console.log('Updating product', productId, updatePayload);
         await updateProducto(productId, updatePayload);
-        
+
+        // If stock decreased compared to previous inventory, create an automatic egreso
+        try {
+          const oldStock = Number(selectedInventario?.stock_producto ?? 0);
+          const newStock = Number(payload.stock_producto !== undefined ? payload.stock_producto : (productData.stock_producto ?? 0));
+          const delta = oldStock - newStock;
+          if (delta > 0) {
+            const pricePerUnit = Number(updatePayload.precio || productData.precio || 0);
+            const monto = Math.round((pricePerUnit * delta) * 100) / 100;
+            const nombreProducto = updatePayload.nombre || productData.nombre || 'producto';
+            const movimientoPayload = {
+              tipo: 'egreso',
+              id_doctor: null,
+              metodo_pago: null,
+              monto: monto,
+              descripcion: `Gasto de "${nombreProducto}" en tratamiento`,
+              fecha: getLocalDateYYYYMMDD()
+            };
+
+            await createMovimientoFinanzas(movimientoPayload);
+            // refresh egresos and dashboard totals
+            queryClient.invalidateQueries({ queryKey: ['egresos'] });
+            queryClient.invalidateQueries({ queryKey: ['dashboard-snapshot'] });
+          }
+        } catch (err) {
+          console.error('No se pudo crear egreso automático por disminución de stock:', err);
+          // don't block the main flow; surface a non-fatal message
+          setErrorMessage('Producto actualizado, pero no se pudo registrar automáticamente el egreso.');
+        }
 
         if (payload.registrarMovimiento) {
           await registrarMovimientoInventario({
             id_producto: productId,
             tipo_movimiento: payload.tipo_movimiento,
-            cantidad: payload.cantidad
+            cantidad: payload.cantidad,
+            fecha: getLocalDateYYYYMMDD()
           });
         }
       }
@@ -340,7 +403,7 @@ export default function InventarioPage() {
             className="search-input"
             placeholder="Buscar por producto, stock o perfil..."
             value={searchTerm}
-            onChange={(event) => setSearchTerm(sanitizeText(event.target.value, 100))}
+            onChange={(event) => setSearchTerm(event.target.value)}
           />
         </div>
 
@@ -375,6 +438,7 @@ export default function InventarioPage() {
                 <div className="skeleton-cell" style={{ width: '16%' }} />
                 <div className="skeleton-cell" style={{ width: '12%' }} />
                 <div className="skeleton-cell" style={{ width: '10%' }} />
+                  <div className="skeleton-cell" style={{ width: '10%' }} />
                 <div className="skeleton-cell" style={{ width: '18%' }} />
               </div>
             ))}
@@ -393,6 +457,7 @@ export default function InventarioPage() {
                 <th>Precio</th>
                 <th className="inventario-col-center">Cantidad Actual</th>
                 <th className="inventario-col-center">Stock Mínimo</th>
+                <th>Fecha de Caducidad</th>
                 <th>Última Actualización</th>
                 <th>Estado</th>
                 <th>Acciones</th>
@@ -424,6 +489,7 @@ export default function InventarioPage() {
                       {inventario.stock_producto ?? 0}
                     </td>
                     <td className="inventario-col-center">{inventario.stock_minimo ?? 0}</td>
+                    <td>{formatDate(inventario.fecha_caducidad)}</td>
                     <td>{formatDate(getUpdateDate(inventario))}</td>
                     <td>
                       <span className={`inventory-status-badge inventory-status-badge--${status}`}>
@@ -493,11 +559,11 @@ export default function InventarioPage() {
       />
       <ConfirmModal
         isOpen={movementConfirmOpen}
-        title="Registrar Movimiento"
-        onConfirm={() => confirmMovementAs('entrada')}
-        onCancel={() => setMovementConfirmOpen(false)}
+        title={movementAction === 'entrada' ? 'Registrar compra y stock' : movementAction === 'salida' ? 'Registrar venta' : 'Registrar Movimiento'}
+        onConfirm={() => confirmMovementAs(movementAction)}
+        onCancel={closeMovementModal}
         isLoading={movementIsSaving}
-        confirmLabel="Entrada"
+        confirmLabel={movementAction === 'entrada' ? 'Confirmar' : movementAction === 'salida' ? 'Confirmar Venta' : 'Confirmar'}
         cancelLabel="Cancelar"
         hideFooter={true}
       >
@@ -510,22 +576,53 @@ export default function InventarioPage() {
               type="number"
               min="1"
               value={pendingMovementQty}
-              onChange={(e) => setPendingMovementQty(sanitizeDigits(e.target.value, 6))}
+              onChange={(e) => setPendingMovementQty(e.target.value)}
               style={{ width: '6rem', padding: '0.25rem' }}
             />
           </label>
-          {!movementConfirmingSale && (
+          {movementFieldErrors.cantidad && <div style={{ color: 'var(--danger)', fontSize: '0.85rem' }}>{movementFieldErrors.cantidad}</div>}
+
+          {movementAction === 'choice' && (
             <div className="cm-modal-actions">
-              <button type="button" className="cm-btn" onClick={() => { setMovementConfirmOpen(false); setMovementShowPayment(false); setMovementMetodoPago('efectivo'); setMovementDetallePago(''); setMovementConfirmingSale(false); }} disabled={movementIsSaving}>Cancelar</button>
-              <button type="button" className="cm-btn cm-btn-confirm" onClick={() => { setMovementShowPayment(true); setMovementConfirmingSale(true); }} disabled={movementIsSaving}>Venta</button>
-              <button type="button" className="cm-btn cm-btn-cancel" onClick={() => confirmMovementAs('entrada')} disabled={movementIsSaving}>Agregar Stock</button>
+              <button type="button" className="cm-btn" onClick={closeMovementModal} disabled={movementIsSaving}>Cancelar</button>
+              <button type="button" className="cm-btn cm-btn-confirm" onClick={() => { setMovementAction('salida'); setMovementError(''); setMovementFieldErrors({}); }} disabled={movementIsSaving}>Venta</button>
+              <button type="button" className="cm-btn cm-btn-cancel" onClick={() => { setMovementAction('entrada'); setMovementError(''); setMovementFieldErrors({}); }} disabled={movementIsSaving}>Agregar Stock</button>
             </div>
           )}
 
-          {/* Mostrar sección de pago debajo de los botones cuando se solicita Salida */}
-          {movementShowPayment && (
+          {movementAction === 'entrada' && (
             <div className="payment-section" style={{ padding: '1rem', border: '1px solid #eee', borderRadius: '6px', marginTop: '0.75rem' }}>
-              <h3 style={{ margin: 0, marginBottom: '0.5rem' }}>Registrar pago</h3>
+              <h3 style={{ margin: 0, marginBottom: '0.5rem' }}>Registrar gasto de compra</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div className="form-group">
+                  <label htmlFor="mov_monto_compra">Dinero invertido / gastado</label>
+                  <input
+                    id="mov_monto_compra"
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="0.00"
+                    value={movementMontoCompra}
+                    onChange={(e) => setMovementMontoCompra(e.target.value.replace(/[^0-9.]/g, ''))}
+                    style={{ width: '100%', padding: '0.5rem' }}
+                  />
+                  {movementFieldErrors.monto && <span className="error-text">{movementFieldErrors.monto}</span>}
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="mov_metodo_pago_compra">Método de pago</label>
+                  <select id="mov_metodo_pago_compra" value={movementMetodoPago} onChange={(e) => setMovementMetodoPago(e.target.value)} style={{ width: '100%', padding: '0.5rem' }}>
+                    <option value="efectivo">Efectivo</option>
+                    <option value="transferencia">Transferencia</option>
+                    <option value="tarjeta">Tarjeta</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {movementAction === 'salida' && (
+            <div className="payment-section" style={{ padding: '1rem', border: '1px solid #eee', borderRadius: '6px', marginTop: '0.75rem' }}>
+              <h3 style={{ margin: 0, marginBottom: '0.5rem' }}>Registrar venta</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 <div className="form-group">
                   <label htmlFor="mov_metodo_pago">Método de pago</label>
@@ -534,21 +631,27 @@ export default function InventarioPage() {
                     <option value="transferencia">Transferencia</option>
                     <option value="tarjeta">Tarjeta</option>
                   </select>
-                  {movementPaymentErrors.metodo && <span className="error-text">{movementPaymentErrors.metodo}</span>}
                 </div>
 
                 <div className="form-group">
                   <label htmlFor="mov_detalle_pago">Detalle</label>
-                  <textarea id="mov_detalle_pago" rows={3} value={movementDetallePago} onChange={(e) => setMovementDetallePago(sanitizeText(e.target.value, 300))} placeholder="Descripción breve del pago (opcional)" style={{ width: '100%', padding: '0.5rem' }} maxLength={300} />
+                  <textarea id="mov_detalle_pago" rows={3} value={movementDetallePago} onChange={(e) => setMovementDetallePago(e.target.value)} placeholder="Descripción breve del pago (opcional)" style={{ width: '100%', padding: '0.5rem' }} />
                 </div>
               </div>
             </div>
           )}
 
-          {movementConfirmingSale && (
+          {movementAction === 'salida' && (
             <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '0.75rem' }}>
-              <button type="button" className="cm-btn" onClick={() => { setMovementConfirmingSale(false); setMovementShowPayment(false); setMovementMetodoPago('efectivo'); setMovementDetallePago(''); setMovementPaymentErrors({}); setMovementError(''); }} disabled={movementIsSaving}>Cancelar</button>
+              <button type="button" className="cm-btn" onClick={closeMovementModal} disabled={movementIsSaving}>Cancelar</button>
               <button type="button" className="cm-btn cm-btn-confirm" onClick={() => confirmMovementAs('salida')} disabled={movementIsSaving}>Confirmar Venta</button>
+            </div>
+          )}
+
+          {movementAction === 'entrada' && (
+            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '0.75rem' }}>
+              <button type="button" className="cm-btn" onClick={closeMovementModal} disabled={movementIsSaving}>Cancelar</button>
+              <button type="button" className="cm-btn cm-btn-confirm" onClick={() => confirmMovementAs('entrada')} disabled={movementIsSaving}>Confirmar</button>
             </div>
           )}
 

@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-import { sanitizeText } from '../../utils/sanitize';
 import ConfirmModal from '../../components/ui/ConfirmModal';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchCitas, createCita, updateCita, deleteCita } from '../../services/api/citas';
@@ -94,7 +93,7 @@ export default function CitasPage() {
 
   const handleEditCita = (cita) => {
     setSelectedCita(cita);
-    setModalMode('edit');
+    setModalMode(String(cita?.estado || '').toLowerCase() === 'atendida' ? 'view' : 'edit');
     setServerFormErrors({});
     setError(null);
     setIsModalOpen(true);
@@ -140,11 +139,28 @@ export default function CitasPage() {
     setError(null);
     setServerFormErrors({});
     try {
+      let savedCita = null;
       if (selectedCita?.id) {
-        await updateCita(selectedCita.id, formData);
+        const response = await updateCita(selectedCita.id, formData);
+        savedCita = response?.cita || null;
       } else {
-        await createCita(formData);
+        const response = await createCita(formData);
+        savedCita = response?.cita || null;
       }
+
+      if (savedCita?.id) {
+        queryClient.setQueryData(['citas'], (current = []) => {
+          if (!Array.isArray(current)) return current;
+          const index = current.findIndex((item) => String(item.id) === String(savedCita.id));
+          if (index === -1) {
+            return [savedCita, ...current];
+          }
+          const next = [...current];
+          next[index] = { ...next[index], ...savedCita };
+          return next;
+        });
+      }
+
       setIsModalOpen(false);
       setSelectedCita(null);
       queryClient.invalidateQueries({ queryKey: ['citas'] });
@@ -208,7 +224,7 @@ export default function CitasPage() {
             className="search-input"
             placeholder="Buscar por paciente, odontólogo o estado..."
             value={searchTerm}
-            onChange={(event) => setSearchTerm(sanitizeText(event.target.value, 100))}
+            onChange={(event) => setSearchTerm(event.target.value)}
             style={{ paddingRight: '1rem' }}
           />
         </div>
@@ -263,7 +279,7 @@ export default function CitasPage() {
         pacientes={pacientes}
         doctores={doctores}
         tratamientos={tratamientos}
-        readOnly={modalMode === 'view'}
+        readOnly={modalMode === 'view' || String(selectedCita?.estado || '').toLowerCase() === 'atendida'}
         isEditing={modalMode === 'edit'}
         externalErrors={serverFormErrors}
       />

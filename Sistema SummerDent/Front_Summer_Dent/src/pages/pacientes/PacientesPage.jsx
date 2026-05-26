@@ -1,5 +1,4 @@
-import { useState, useMemo } from 'react';
-import { sanitizeText } from '../../utils/sanitize';
+import { useState } from 'react';
 import ConfirmModal from '../../components/ui/ConfirmModal';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchPacientes, createPaciente, updatePaciente, deletePaciente } from '../../services/api/pacientes';
@@ -33,6 +32,10 @@ export default function PacientesPage() {
     const search = searchTerm.toLowerCase();
     return fullName.includes(search) || cedula.includes(search);
   });
+
+const handleClearFieldError = (field) => {
+  setModalFieldErrors(prev => ({ ...prev, [field]: '' }));
+};
 
   const handleNewPaciente = () => {
     setSelectedPaciente(null);
@@ -182,7 +185,7 @@ export default function PacientesPage() {
           className="search-input"
           placeholder="Buscar por nombre o cédula..."
           value={searchTerm}
-          onChange={(e) => setSearchTerm(sanitizeText(e.target.value, 100))}
+          onChange={(e) => setSearchTerm(e.target.value)}
         />
       </div>
 
@@ -199,7 +202,7 @@ export default function PacientesPage() {
       )}
 
       <PacienteModal
-        key={selectedPaciente?.id_cedula || 'new-paciente'}
+        key={`${selectedPaciente?.id_cedula ?? 'new'}-${isModalOpen}`}
         isOpen={isModalOpen}
         onClose={() => {
           setIsModalOpen(false);
@@ -212,6 +215,7 @@ export default function PacientesPage() {
         readOnly={modalMode === 'view'}
         isEditing={modalMode === 'edit'}
         externalErrors={modalFieldErrors}
+        onClearExternalError={handleClearFieldError}
       />
       <ConfirmModal
         isOpen={confirmOpen}
