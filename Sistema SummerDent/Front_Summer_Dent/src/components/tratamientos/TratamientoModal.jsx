@@ -7,7 +7,8 @@ const AREAS_PERMITIDAS = [
   'Cirugía Odontológica',
   'Endodoncia',
   'Prótesis Removible Valplast o Flexible',
-  'Acrílicas'
+  'Acrílicas',
+  'Prótesis Cromo Cobalto'
 ];
 
 const initialFormState = {
@@ -101,7 +102,7 @@ export default function TratamientoModal({
         nextErrors.nombre = 'El nombre debe contener al menos 5 letras';
       } else if (limpio.length > 64) {
         nextErrors.nombre = 'El nombre no puede superar 64 caracteres';
-      } else if (!/^[A-Za-z0-9ÁÉÍÓÚáéíóúÑñ\s\-\.,]+$/.test(limpio)) {
+      } else if (!/^[A-Za-z0-9ÁÉÍÓÚáéíóúÑñ\s\-.,]+$/.test(limpio)) {
         nextErrors.nombre = 'El nombre contiene caracteres inválidos';
       }
     }
@@ -137,7 +138,7 @@ export default function TratamientoModal({
     let nextValue = value;
     if (name === 'nombre') {
       // sanitize: remove '@' and other disallowed chars as user types
-      nextValue = value.replace(/[^A-Za-z0-9ÁÉÍÓÚáéíóúÑñ\s\-\.,]/g, '');
+      nextValue = value.replace(/[^A-Za-z0-9ÁÉÍÓÚáéíóúÑñ\s\-.,]/g, '');
     }
     if (name === 'descripcion') {
       // disallow the '@' character in descripcion
@@ -167,7 +168,7 @@ export default function TratamientoModal({
     if (name === 'nombre' || name === 'descripcion') {
       // Prevent raw paste and insert sanitized text (strip disallowed chars)
       event.preventDefault();
-      const sanitized = paste.replace(/[^A-Za-z0-9ÁÉÍÓÚáéíóúÑñ\s\-\.,]/g, '');
+      const sanitized = paste.replace(/[^A-Za-z0-9ÁÉÍÓÚáéíóúÑñ\s\-.,]/g, '');
       setFormData((prev) => ({ ...prev, [name]: (prev[name] || '') + sanitized }));
 
       if (errors[name]) {

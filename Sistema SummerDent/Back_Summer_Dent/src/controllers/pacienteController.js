@@ -94,8 +94,8 @@ export const crearPacienteController = async (req, res) => {
     if (!apellido || !String(apellido).trim()) return res.status(400).json({ error: 'El apellido es obligatorio' });
 
     if (!esCedulaValida(id_cedula)) return res.status(400).json({ error: 'Cédula inválida' });
-    if (!esTextoValido(nombre, 2, 64)) return res.status(400).json({ error: 'El nombre debe tener entre 2 y 64 caracteres' });
-    if (!esTextoValido(apellido, 2, 64)) return res.status(400).json({ error: 'El apellido debe tener entre 2 y 64 caracteres' });
+    if (!esTextoValido(nombre, 2, 15)) return res.status(400).json({ error: 'El nombre debe tener entre 2 y 15 caracteres' });
+    if (!esTextoValido(apellido, 2, 15)) return res.status(400).json({ error: 'El apellido debe tener entre 2 y 15 caracteres' });
     if (!esNombreValido(nombre)) return res.status(400).json({ error: 'El nombre solo debe contener letras y espacios' });
     if (!esNombreValido(apellido)) return res.status(400).json({ error: 'El apellido solo debe contener letras y espacios' });
     if (!esFechaNacimientoValida(fecha_nacimiento)) return res.status(400).json({ error: 'La fecha de nacimiento es obligatoria, debe estar en formato YYYY-MM-DD y no puede ser futura' });
@@ -208,6 +208,7 @@ export const actualizarPacienteController = async (req, res) => {
     if (!token) return res.status(401).json({ error: 'Token no proporcionado' });
 
     const supabaseUser = getSupabaseClientWithToken(token);
+    const perfil = await getPerfilFromToken(token);
     const { id } = req.params;
     const { id_cedula, nombre, apellido, fecha_nacimiento, telefono, correo, direccion } = req.body;
 
@@ -218,6 +219,9 @@ export const actualizarPacienteController = async (req, res) => {
     }
 
     const camposPermitidos = ['id_cedula', 'nombre', 'apellido', 'fecha_nacimiento', 'telefono', 'correo', 'direccion'];
+    if (perfil && perfil.rol === 'superadmin') {
+      camposPermitidos.push('sede_id');
+    }
     const camposRecibidos = Object.keys(req.body || {});
 
     if (camposRecibidos.length === 0) {
@@ -251,8 +255,8 @@ export const actualizarPacienteController = async (req, res) => {
 
     if (nombre !== undefined && !String(nombre).trim()) return res.status(400).json({ error: 'El nombre no puede estar vacío' });
     if (apellido !== undefined && !String(apellido).trim()) return res.status(400).json({ error: 'El apellido no puede estar vacío' });
-    if (nombre !== undefined && !esTextoValido(nombre, 2, 64)) return res.status(400).json({ error: 'El nombre debe tener entre 2 y 64 caracteres' });
-    if (apellido !== undefined && !esTextoValido(apellido, 2, 64)) return res.status(400).json({ error: 'El apellido debe tener entre 2 y 64 caracteres' });
+    if (nombre !== undefined && !esTextoValido(nombre, 2, 15)) return res.status(400).json({ error: 'El nombre debe tener entre 2 y 15 caracteres' });
+    if (apellido !== undefined && !esTextoValido(apellido, 2, 15)) return res.status(400).json({ error: 'El apellido debe tener entre 2 y 15 caracteres' });
     if (nombre !== undefined && !esNombreValido(nombre)) return res.status(400).json({ error: 'El nombre solo debe contener letras y espacios' });
     if (apellido !== undefined && !esNombreValido(apellido)) return res.status(400).json({ error: 'El apellido solo debe contener letras y espacios' });
     if (fecha_nacimiento !== undefined && fecha_nacimiento !== null && fecha_nacimiento !== '' && !esFechaNacimientoValida(fecha_nacimiento)) return res.status(400).json({ error: 'La fecha de nacimiento debe estar en formato YYYY-MM-DD y no puede ser futura' });
@@ -282,6 +286,14 @@ export const actualizarPacienteController = async (req, res) => {
     if (telefono !== undefined) updates.telefono = telefono ? String(telefono).trim() : null;
     if (correo !== undefined) updates.correo = correoLimpioUpdate || null;
     if (direccion !== undefined) updates.direccion = direccion ? String(direccion).trim() : null;
+    if (Object.prototype.hasOwnProperty.call(req.body, 'sede_id')) {
+      if (!(perfil && perfil.rol === 'superadmin')) {
+        return res.status(403).json({ error: 'No autorizado para asignar sede' });
+      }
+      const sedeNum = Number(req.body.sede_id);
+      if (Number.isNaN(sedeNum)) return res.status(400).json({ error: 'sede_id inválido' });
+      updates.sede_id = sedeNum;
+    }
 
     if (Object.keys(updates).length === 0) {
       return res.status(400).json({ error: 'No hay campos válidos para actualizar' });
@@ -298,7 +310,7 @@ export const actualizarPacienteController = async (req, res) => {
 
 export const eliminarPacienteController = async (req, res) => {
   try {
-    const token = (req.headers.authorization || '').startsWith('Bearer ') ? req.headers.authorization.replace('Bearer ', '').trim() : null;
+    const token = getAuthTokenFromReq(req);
     if (!token) return res.status(401).json({ error: 'Token no proporcionado' });
 
     const { id } = req.params;

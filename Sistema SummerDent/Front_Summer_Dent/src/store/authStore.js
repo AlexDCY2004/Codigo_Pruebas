@@ -39,12 +39,9 @@ export const useAuthStore = create((set) => ({
         localStorage.removeItem(USER_KEY);
       }
     } catch (e) {
-      void e; // Ignore storage errors to keep app usable in restricted environments.
+      void e;
     }
 
-    // Default sedeActiva behavior:
-    // - administrador: fuerza su propia sede_id
-    // - superadmin: mantiene la sedeActiva almacenada o null
     let sedeActivaToSet = null;
     try {
       const stored = getStoredSedeActiva();
@@ -88,24 +85,10 @@ export const useAuthStore = create((set) => ({
         localStorage.setItem(SEDE_KEY, String(sedeId));
       }
     } catch (e) {
-      void e; /* ignore */
+      void e;
     }
-
+    // Solo actualiza el estado, React Query se encarga del resto
     set({ sedeActiva: sedeId ?? null });
-
-    // Notify other parts of the app and refresh so queries pick the new sede immediately.
-    try {
-      window.dispatchEvent(new CustomEvent('sedeChanged', { detail: sedeId ?? null }));
-    } catch (e) {
-      void e;
-    }
-
-    try {
-      // reload to force all pages to re-run their queries with the new sedeActiva
-      window.location.reload();
-    } catch (e) {
-      void e;
-    }
   },
   logout: () => {
     try {
@@ -123,7 +106,7 @@ export const useAuthStore = create((set) => ({
     try {
       localStorage.removeItem(USER_KEY);
     } catch (e) {
-      void e; // Ignore storage errors.
+      void e;
     }
 
     try {

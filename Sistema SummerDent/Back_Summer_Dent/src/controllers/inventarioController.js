@@ -1,5 +1,6 @@
 import { getSupabaseClientWithToken } from '../configuracionesDB/supabaseClient.js';
 import { getPerfilFromToken } from '../utils/perfilUtils.js';
+import { actualizarTotalesCajaParaPeriodo, normalizeMetodoPago } from './movimientoFinanzasController.js';
 import { getAuthTokenFromReq } from '../utils/authUtils.js';
 
 export const obtenerInventariosController = async (_req, res) => {
@@ -123,7 +124,7 @@ export const aumentarStockController = async (req, res) => {
 
 export const registraMovimientoController = async (req, res) => {
     try {
-        const token = (req.headers.authorization || '').startsWith('Bearer ') ? req.headers.authorization.replace('Bearer ', '').trim() : null;
+        const token = getAuthTokenFromReq(req);
         if (!token) return res.status(401).json({ error: 'Token no proporcionado' });
         const supabaseUser = getSupabaseClientWithToken(token);
 
@@ -166,13 +167,12 @@ export const registraMovimientoController = async (req, res) => {
             sedeToUse = perfil.sede_id;
         }
 
-        const allowedPaymentMethods = ['efectivo', 'transferencia', 'tarjeta'];
-        const metodoPagoNormalizado = (metodo_pago !== undefined && metodo_pago !== null && String(metodo_pago).trim() !== '')
-            ? String(metodo_pago).trim()
-            : 'efectivo';
-        if (!allowedPaymentMethods.includes(metodoPagoNormalizado)) {
-            return res.status(400).json({ error: `metodo_pago inválido. Debe ser uno de: ${allowedPaymentMethods.join(', ')}` });
+        // Normalize metodo_pago using shared helper. If provided but unknown, return error.
+        const mpNormInitial = normalizeMetodoPago(metodo_pago);
+        if (metodo_pago !== undefined && metodo_pago !== null && String(metodo_pago).trim() !== '' && mpNormInitial === null) {
+            return res.status(400).json({ error: `metodo_pago inválido. Debe ser uno de: efectivo, transferencia, tarjeta, deposito` });
         }
+        const metodoPagoNormalizado = mpNormInitial !== undefined ? mpNormInitial : 'efectivo';
 
         const gastoCompra = Number(monto);
 
@@ -219,6 +219,18 @@ export const registraMovimientoController = async (req, res) => {
                     return res.status(500).json({ error: movErr.message || movErr });
                 }
 
+                // Recalculate caja totals for this month
+                try {
+                    const parts = String(today).split('-');
+                    const y = Number(parts[0]);
+                    const m = Number(parts[1]);
+                    if (!Number.isNaN(y) && !Number.isNaN(m) && sedeToUse !== null) {
+                        await actualizarTotalesCajaParaPeriodo(supabaseUser, sedeToUse, y, m);
+                    }
+                } catch (e) {
+                    // don't block flow
+                }
+
                 return res.status(201).json({ mensaje: 'Entrada registrada, stock creado y egreso creado', inventario: data, movimiento: movData });
             }
 
@@ -245,6 +257,16 @@ export const registraMovimientoController = async (req, res) => {
                 return res.status(500).json({ error: movErr.message || movErr });
             }
 
+            // Recalculate caja totals for this month
+            try {
+                const parts = String(today).split('-');
+                const y = Number(parts[0]);
+                const m = Number(parts[1]);
+                if (!Number.isNaN(y) && !Number.isNaN(m) && sedeToUse !== null) {
+                    await actualizarTotalesCajaParaPeriodo(supabaseUser, sedeToUse, y, m);
+                }
+            } catch (e) {}
+
             return res.json({ mensaje: 'Entrada registrada, stock actualizado y egreso creado', inventario: updated, movimiento: movData });
         }
 
@@ -268,9 +290,10 @@ export const registraMovimientoController = async (req, res) => {
 
         // crear movimiento financiero: tipo 'ingreso', id_doctor NULL (no especificado), descripcion con nombre del producto
         // validar metodo_pago si fue provisto
+        // Validate metodo_pago if provided
         if (metodo_pago !== undefined && metodo_pago !== null && String(metodo_pago).trim() !== '') {
-            const allowed = ['efectivo', 'transferencia', 'tarjeta'];
-            if (!allowed.includes(String(metodo_pago))) return res.status(400).json({ error: `metodo_pago inválido. Debe ser uno de: ${allowed.join(', ')}` });
+            const mpCheck = normalizeMetodoPago(metodo_pago);
+            if (mpCheck === null) return res.status(400).json({ error: `metodo_pago inválido. Debe ser uno de: efectivo, transferencia, tarjeta, deposito` });
         }
 
         // Construir descripción incluyendo el detalle de pago (no existe columna detalle_pago)
@@ -288,18 +311,30 @@ export const registraMovimientoController = async (req, res) => {
             fecha: today
         };
         if (sedeToUse !== null) movimientoPayload.sede_id = sedeToUse;
-        if (metodo_pago !== undefined && metodo_pago !== null && String(metodo_pago).trim() !== '') movimientoPayload.metodo_pago = String(metodo_pago);
-
-        // Si es venta y no hay metodo_pago, usar 'efectivo' por defecto para evitar NOT NULL
-        if (String(tipo_movimiento) === 'salida' && (!movimientoPayload.metodo_pago || String(movimientoPayload.metodo_pago).trim() === '')) {
-            movimientoPayload.metodo_pago = 'efectivo';
+        // Normalize and set metodo_pago. If not provided, fallback to 'efectivo'.
+        const mpNorm = normalizeMetodoPago(metodo_pago);
+        if (metodo_pago !== undefined && metodo_pago !== null && String(metodo_pago).trim() !== '' && mpNorm === null) {
+            return res.status(400).json({ error: `metodo_pago inválido. Debe ser uno de: efectivo, transferencia, tarjeta, deposito` });
         }
+        movimientoPayload.metodo_pago = mpNorm !== undefined ? mpNorm : 'efectivo';
 
         const { data: movData, error: movErr } = await supabaseUser.from('movimiento_finanzas').insert([movimientoPayload]).select().maybeSingle();
         if (movErr) {
             // intentar revertir inventario al estado anterior
             await supabaseUser.from('inventario').update({ stock_producto: currentStock, fecha_actualizacion: today }).eq('id', existing.id);
             return res.status(500).json({ error: movErr.message || movErr });
+        }
+
+        // After inserting movement for sale, recalculate caja totals for this month
+        try {
+            const parts = String(today).split('-');
+            const y = Number(parts[0]);
+            const m = Number(parts[1]);
+            if (!Number.isNaN(y) && !Number.isNaN(m) && sedeToUse !== null) {
+                await actualizarTotalesCajaParaPeriodo(supabaseUser, sedeToUse, y, m);
+            }
+        } catch (e) {
+            // ignore
         }
 
         return res.json({ mensaje: 'Salida registrada, stock actualizado y movimiento financiero creado', inventario: updatedInv, movimiento: movData });

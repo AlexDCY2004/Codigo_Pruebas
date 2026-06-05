@@ -1,11 +1,7 @@
 import { getSupabaseClientWithToken } from '../configuracionesDB/supabaseClient.js';
 import { getAuthTokenFromReq } from '../utils/authUtils.js';
 
-const getTokenFromReq = (req) => {
-    const header = req.headers.authorization || '';
-    if (!header.startsWith('Bearer ')) return null;
-    return header.replace('Bearer ', '').trim();
-};
+const getTokenFromReq = (req) => getAuthTokenFromReq(req);
 
 export const obtenerSedesController = async (req, res) => {
     try {

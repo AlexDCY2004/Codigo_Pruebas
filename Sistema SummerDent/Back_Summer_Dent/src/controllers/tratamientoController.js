@@ -9,7 +9,8 @@ const AREAS_PERMITIDAS = [
   'Cirugía Odontológica',
   'Endodoncia',
   'Prótesis Removible Valplast o Flexible',
-  'Acrílicas'
+  'Acrílicas',
+  'Prótesis Cromo Cobalto'
 ];
 const esIdValido = (id) => /^\d+$/.test(String(id || '').trim()) && Number(String(id).trim()) > 0;
 

@@ -15,13 +15,16 @@ export const apiClient = axios.create({
 
 apiClient.interceptors.request.use((config) => {
   const sedeActiva = useAuthStore.getState().sedeActiva;
+  const requestUrl = String(config.url || '');
+  const requestMethod = String(config.method || 'get').toLowerCase();
+  const isCitasUpdate = requestUrl.startsWith('/api/citas/') && (requestMethod === 'put' || requestMethod === 'patch');
 
   // Propagar sedeActiva:
   // - Para GET requests: añadir como query param `sede_id` si está definida
   try {
-    if (sedeActiva !== null && sedeActiva !== undefined) {
+    if (sedeActiva !== null && sedeActiva !== undefined && !isCitasUpdate) {
       if (!config.params) config.params = {};
-      if (!config.method || config.method.toLowerCase() === 'get' || config.method.toLowerCase() === 'delete') {
+      if (!config.method || requestMethod === 'get' || requestMethod === 'delete') {
         config.params = { ...(config.params || {}), sede_id: sedeActiva };
       } else {
         if (!config.data) config.data = {};

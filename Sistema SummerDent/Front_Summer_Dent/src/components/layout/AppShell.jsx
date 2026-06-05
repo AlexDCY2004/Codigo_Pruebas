@@ -1,5 +1,5 @@
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuthStore } from '../../store/authStore';
 import apiClient from '../../services/api/client';
 import logoImage from '../../assets/Logo.png';
@@ -8,7 +8,7 @@ const navItems = [
   { to: '/dashboard', label: 'Dashboard', icon: 'grid' },
   { to: '/pacientes', label: 'Pacientes', icon: 'users' },
   { to: '/citas', label: 'Citas', icon: 'calendar' },
-  { to: '/doctores', label: 'Odontologos', icon: 'doctor' },
+  { to: '/doctores', label: 'Odontólogos', icon: 'doctor' },
   { to: '/tratamientos', label: 'Tratamientos', icon: 'pill' },
   { to: '/ingresos', label: 'Ingresos', icon: 'trend-up' },
   { to: '/egresos', label: 'Egresos', icon: 'trend-down' },
@@ -29,6 +29,20 @@ const Icon = ({ type }) => {
   return <svg {...common}><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>;
 };
 
+const getUserInitials = (name) => {
+  if (!name) return 'SD';
+
+  const initials = name
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() || '')
+    .join('');
+
+  return initials || 'SD';
+};
+
 export default function AppShell() {
   const location = useLocation();
   const user = useAuthStore((state) => state.user);
@@ -36,6 +50,21 @@ export default function AppShell() {
   const sedeActiva = useAuthStore((state) => state.sedeActiva);
   const setSedeActiva = useAuthStore((state) => state.setSedeActiva);
   const [sedes, setSedes] = useState([]);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [isMobileUserMenuOpen, setIsMobileUserMenuOpen] = useState(false);
+  const [isSedeMenuOpen, setIsSedeMenuOpen] = useState(false);
+  const desktopSedeSelectorRef = useRef(null);
+  const mobileSedeSelectorRef = useRef(null);
+  const userInitials = getUserInitials(user?.nombre);
+
+  const sedeOptions = [
+    { value: '', label: 'Todas las sedes' },
+    ...sedes
+      .filter((s) => ['Sede Quito', 'Sede El Carmen'].includes(s.nombre))
+      .map((s) => ({ value: String(s.id), label: s.nombre }))
+  ];
+
+  const activeSedeLabel = sedeOptions.find((option) => option.value === String(sedeActiva ?? ''))?.label || 'Todas las sedes';
 
   useEffect(() => {
     let mounted = true;
@@ -56,9 +85,92 @@ export default function AppShell() {
     };
   }, [user]);
 
+  useEffect(() => {
+    if (typeof document === 'undefined') return undefined;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = isMobileSidebarOpen ? 'hidden' : previousOverflow;
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isMobileSidebarOpen]);
+
+  useEffect(() => {
+    const handlePointerDown = (event) => {
+      const isInsideDesktopSelector = desktopSedeSelectorRef.current?.contains(event.target);
+      const isInsideMobileSelector = mobileSedeSelectorRef.current?.contains(event.target);
+
+      if (!isInsideDesktopSelector && !isInsideMobileSelector) {
+        setIsSedeMenuOpen(false);
+      }
+    };
+
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') {
+        setIsSedeMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('touchstart', handlePointerDown);
+    document.addEventListener('keydown', handleEscape);
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('touchstart', handlePointerDown);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, []);
+
+  const closeMobileSidebar = () => setIsMobileSidebarOpen(false);
+
+  const toggleMobileUserMenu = () => {
+    if (window.innerWidth > 880) return;
+    setIsMobileUserMenuOpen((open) => !open);
+  };
+
+  const closeMobileUserMenu = () => setIsMobileUserMenuOpen(false);
+
+  const handleSedeChange = (value) => {
+    setSedeActiva(value ? Number(value) : null);
+    setIsSedeMenuOpen(false);
+  };
+
+  const handleNavClick = () => {
+    if (window.innerWidth <= 880) {
+      closeMobileSidebar();
+      closeMobileUserMenu();
+    }
+    try {
+      if (document && document.activeElement) document.activeElement.blur();
+    } catch {
+      /* ignore */
+    }
+  };
+
   return (
     <div className="app-shell">
-      <aside className="app-shell__sidebar">
+      <div
+        className={isMobileSidebarOpen ? 'app-shell__sidebar-overlay app-shell__sidebar-overlay--visible' : 'app-shell__sidebar-overlay'}
+        onClick={closeMobileSidebar}
+        aria-hidden="true"
+      />
+
+      <aside
+        id="app-shell-sidebar"
+        className={isMobileSidebarOpen ? 'app-shell__sidebar app-shell__sidebar--mobile-open' : 'app-shell__sidebar'}
+      >
+        <div className="app-shell__sidebar-mobile-header">
+          <span className="app-shell__sidebar-mobile-title">Menú</span>
+          <button type="button" className="app-shell__sidebar-close" onClick={closeMobileSidebar} aria-label="Cerrar menú">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+              <path d="M18 6 6 18" />
+              <path d="m6 6 12 12" />
+            </svg>
+          </button>
+        </div>
+
         <nav className="sidebar-nav">
           {navItems.map((item) => {
             const isActive = location.pathname === item.to;
@@ -68,14 +180,7 @@ export default function AppShell() {
                 key={item.to}
                 to={item.to}
                 className={isActive ? 'nav-link nav-link--active' : 'nav-link'}
-                onClick={() => {
-                  // remove focus after navigation so sidebar collapses when mouse leaves
-                  try {
-                    if (document && document.activeElement) document.activeElement.blur();
-                  } catch {
-                    /* ignore */
-                  }
-                }}
+                onClick={handleNavClick}
               >
                 <Icon type={item.icon} />
                 <span className="nav-label">{item.label}</span>
@@ -87,35 +192,130 @@ export default function AppShell() {
 
       <section className="app-shell__content">
         <header className="app-shell__header">
+          <button
+            type="button"
+            className="app-shell__menu-toggle"
+            onClick={() => setIsMobileSidebarOpen((open) => !open)}
+            aria-label={isMobileSidebarOpen ? 'Cerrar menú' : 'Abrir menú'}
+            aria-expanded={isMobileSidebarOpen}
+            aria-controls="app-shell-sidebar"
+          >
+            <span />
+            <span />
+            <span />
+          </button>
+
           <div className="header-brand">
             <img src={logoImage} alt="Logo Summer Dent" className="header-brand__logo" />
             <div>
               <h2>Summer Dent</h2>
               {user && user.rol === 'superadmin' ? (
-                <div style={{ marginTop: 8 }}>
-                  <select
-                      className={`seg-btn seg-btn--sede is-active`}
-                      value={sedeActiva ?? ''}
-                      onChange={(e) => setSedeActiva(e.target.value ? Number(e.target.value) : null)}
+                <div className="header-desktop-sede sede-selector" ref={desktopSedeSelectorRef}>
+                  <span className="header-desktop-sede__label">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M12 22s6-5.3 6-11a6 6 0 1 0-12 0c0 5.7 6 11 6 11Z" fill="none" stroke="currentColor" strokeWidth="2" />
+                      <circle cx="12" cy="11" r="2.5" fill="none" stroke="currentColor" strokeWidth="2" />
+                    </svg>
+                    <span>Sede:</span>
+                  </span>
+                  <div className="header-desktop-sede__control">
+                    <button
+                      type="button"
+                      className="header-desktop-sede__trigger"
+                      aria-haspopup="listbox"
+                      aria-expanded={isSedeMenuOpen}
+                      onClick={() => setIsSedeMenuOpen((open) => !open)}
                     >
-                    <option value="">Todas las sedes</option>
-                    {sedes
-                      .filter((s) => ['Sede Quito', 'Sede El Carmen'].includes(s.nombre))
-                      .map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.nombre}
-                        </option>
-                      ))}
-                  </select>
+                      <span className="header-desktop-sede__trigger-text">{activeSedeLabel}</span>
+                    </button>
+                    <svg className="header-desktop-sede__chevron" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="m6 9 6 6 6-6" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    {isSedeMenuOpen ? (
+                      <div className="sede-selector__menu" role="listbox" aria-label="Selector de sedes">
+                        {sedeOptions.map((option) => {
+                          const isSelected = option.value === String(sedeActiva ?? '');
+
+                          return (
+                            <button
+                              key={option.value || 'all'}
+                              type="button"
+                              role="option"
+                              aria-selected={isSelected}
+                              className={isSelected ? 'sede-selector__item sede-selector__item--active' : 'sede-selector__item'}
+                              onClick={() => handleSedeChange(option.value)}
+                            >
+                              {option.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
               ) : null}
             </div>
           </div>
-          <div className="header-user-block">
-            <div className="header-user-info">
-              <span>{user?.nombre || 'Secretaria Principal'}</span>
+          <button
+            type="button"
+            className="header-user-avatar header-user-avatar--mobile"
+            aria-label={isMobileUserMenuOpen ? 'Cerrar menú de usuario' : 'Abrir menú de usuario'}
+            aria-expanded={isMobileUserMenuOpen}
+            onClick={toggleMobileUserMenu}
+          >
+            {userInitials}
+          </button>
+          {user && user.rol === 'superadmin' ? (
+            <div className="header-mobile-sede sede-selector" ref={mobileSedeSelectorRef}>
+              <span className="header-mobile-sede__label">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 22s6-5.3 6-11a6 6 0 1 0-12 0c0 5.7 6 11 6 11Z" fill="none" stroke="currentColor" strokeWidth="2" />
+                  <circle cx="12" cy="11" r="2.5" fill="none" stroke="currentColor" strokeWidth="2" />
+                </svg>
+                <span>Sede:</span>
+              </span>
+              <div className="header-mobile-sede__control">
+                <button
+                  type="button"
+                  className="header-mobile-sede__trigger"
+                  aria-haspopup="listbox"
+                  aria-expanded={isSedeMenuOpen}
+                  onClick={() => setIsSedeMenuOpen((open) => !open)}
+                >
+                  <span className="header-mobile-sede__trigger-text">{activeSedeLabel}</span>
+                </button>
+                <svg className="header-mobile-sede__chevron" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="m6 9 6 6 6-6" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                {isSedeMenuOpen ? (
+                  <div className="sede-selector__menu sede-selector__menu--mobile" role="listbox" aria-label="Selector de sedes">
+                    {sedeOptions.map((option) => {
+                      const isSelected = option.value === String(sedeActiva ?? '');
+
+                      return (
+                        <button
+                          key={option.value || 'all'}
+                          type="button"
+                          role="option"
+                          aria-selected={isSelected}
+                          className={isSelected ? 'sede-selector__item sede-selector__item--active' : 'sede-selector__item'}
+                          onClick={() => handleSedeChange(option.value)}
+                        >
+                          {option.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : null}
+              </div>
             </div>
-            {null}
+          ) : null}
+
+          <div className={isMobileUserMenuOpen ? 'header-user-block header-user-block--mobile-open' : 'header-user-block'}>
+            <div className="header-user-info">
+              <strong className="header-user-info__label">Usuario:</strong>
+              <span className="header-user-info__name">{user?.nombre || 'Secretaria Principal'}</span>
+            </div>
             <button type="button" onClick={logout} className="logout-btn">
               Cerrar sesión
             </button>

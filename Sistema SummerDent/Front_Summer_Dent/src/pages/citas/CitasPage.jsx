@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import ConfirmModal from '../../components/ui/ConfirmModal';
+import Button from '../../components/ui/Button';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchCitas, createCita, updateCita, deleteCita } from '../../services/api/citas';
 import { fetchPacientes } from '../../services/api/pacientes';
@@ -18,10 +19,13 @@ const getPacienteNombre = (cita, pacientes) => {
   return paciente ? `${paciente.nombre} ${paciente.apellido}`.trim() : '-';
 };
 
+const CITAS_POR_PAGINA = 15;
+
 export default function CitasPage() {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilter, setDateFilter] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedCita, setSelectedCita] = useState(null);
   const [modalMode, setModalMode] = useState('create'); // 'create' | 'edit' | 'view'
@@ -83,6 +87,21 @@ export default function CitasPage() {
     });
   }, [citas, doctores, pacientes, searchTerm, dateFilter]);
 
+  const totalPages = Math.max(1, Math.ceil(filteredCitas.length / CITAS_POR_PAGINA));
+
+  const paginatedCitas = useMemo(() => {
+    const startIndex = (currentPage - 1) * CITAS_POR_PAGINA;
+    return filteredCitas.slice(startIndex, startIndex + CITAS_POR_PAGINA);
+  }, [currentPage, filteredCitas]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, dateFilter]);
+
+  useEffect(() => {
+    setCurrentPage((page) => Math.min(page, totalPages));
+  }, [totalPages]);
+
   const handleNewCita = () => {
     setSelectedCita(null);
     setModalMode('create');
@@ -142,10 +161,20 @@ export default function CitasPage() {
       let savedCita = null;
       if (selectedCita?.id) {
         const response = await updateCita(selectedCita.id, formData);
-        savedCita = response?.cita || null;
+        savedCita = {
+          ...(response?.cita || {}),
+          ...formData,
+          id: response?.cita?.id || selectedCita.id,
+          fecha: formData.fecha
+        };
       } else {
         const response = await createCita(formData);
-        savedCita = response?.cita || null;
+        savedCita = {
+          ...(response?.cita || {}),
+          ...formData,
+          id: response?.cita?.id || null,
+          fecha: formData.fecha
+        };
       }
 
       if (savedCita?.id) {
@@ -164,6 +193,15 @@ export default function CitasPage() {
       setIsModalOpen(false);
       setSelectedCita(null);
       queryClient.invalidateQueries({ queryKey: ['citas'] });
+      // Invalidate caja/dashboard related queries so totals refresh immediately
+      try {
+        queryClient.invalidateQueries({ queryKey: ['caja-mensual'] });
+        queryClient.invalidateQueries({ queryKey: ['caja-mensual-dashboard'] });
+        queryClient.invalidateQueries({ queryKey: ['caja-mensual-history'] });
+        queryClient.invalidateQueries({ queryKey: ['dashboard-snapshot'] });
+      } catch {
+        // ignore
+      }
     } catch (err) {
       const serverError = err?.response?.data?.error || err?.response?.data?.mensaje || err?.response?.data?.message || err.message;
       // If backend sent a string message, show it inside the modal form; otherwise fallback to top error
@@ -208,29 +246,32 @@ export default function CitasPage() {
           alignItems: 'end'
         }}
       >
-        <div style={{ position: 'relative' }}>
-          <svg
-            className="search-icon"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
-            <circle cx="11" cy="11" r="8" />
-            <path d="m21 21-4.35-4.35" />
-          </svg>
-          <input
-            type="text"
-            className="search-input"
-            placeholder="Buscar por paciente, odontólogo o estado..."
-            value={searchTerm}
-            onChange={(event) => setSearchTerm(event.target.value)}
-            style={{ paddingRight: '1rem' }}
-          />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+          <label style={{ fontWeight: 700, fontSize: '0.85rem' }}>Búsqueda</label>
+          <div style={{ position: 'relative' }}>
+            <svg
+              className="search-icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <circle cx="11" cy="11" r="8" />
+              <path d="m21 21-4.35-4.35" />
+            </svg>
+            <input
+              type="text"
+              className="search-input"
+              placeholder="Buscar por paciente, odontólogo o estado..."
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              style={{ paddingRight: '1rem' }}
+            />
+          </div>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-          <label style={{ fontSize: '0.85rem', color: '#546e7a' }}>Filtrar por fecha</label>
+          <label style={{ fontSize: '0.85rem', fontWeight: 700 }}>Fecha</label>
           <input
             type="date"
             className="search-input finance-date-input"
@@ -253,16 +294,44 @@ export default function CitasPage() {
       {isLoading ? (
         <LoadingState />
       ) : (
-        <CitasTable
-          citas={isError ? [] : filteredCitas}
-          pacientes={pacientes}
-          doctores={doctores}
-          tratamientos={tratamientos}
-          onEdit={handleEditCita}
-          onDelete={handleDeleteCita}
-          onView={handleViewCita}
-          isLoading={false}
-        />
+        <>
+          <CitasTable
+            citas={isError ? [] : paginatedCitas}
+            pacientes={pacientes}
+            doctores={doctores}
+            tratamientos={tratamientos}
+            onEdit={handleEditCita}
+            onDelete={handleDeleteCita}
+            onView={handleViewCita}
+            isLoading={false}
+          />
+
+          {filteredCitas.length > 0 && (
+            <div className="finance-pagination">
+              <div className="finance-pagination__info">
+                Mostrando {Math.min(filteredCitas.length, (currentPage - 1) * CITAS_POR_PAGINA + 1)}-
+                {Math.min(filteredCitas.length, currentPage * CITAS_POR_PAGINA)} de {filteredCitas.length}
+              </div>
+              <div className="finance-pagination__controls">
+                <Button
+                  variant="secondary"
+                  onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                  disabled={currentPage <= 1}
+                >
+                  Anterior
+                </Button>
+                <span className="finance-pagination__page">Página {currentPage} de {totalPages}</span>
+                <Button
+                  variant="secondary"
+                  onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                  disabled={currentPage >= totalPages}
+                >
+                  Siguiente
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       <CitaModal

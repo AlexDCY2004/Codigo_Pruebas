@@ -19,6 +19,21 @@ function ReadRow({ label, value }) {
   );
 }
 
+const computeAgeFromDate = (fecha) => {
+  if (!fecha) return '-';
+  try {
+    const d = new Date(fecha);
+    if (Number.isNaN(d.getTime())) return '-';
+    const now = new Date();
+    let age = now.getFullYear() - d.getFullYear();
+    const m = now.getMonth() - d.getMonth();
+    if (m < 0 || (m === 0 && now.getDate() < d.getDate())) age--;
+    return Number.isFinite(age) && age >= 0 ? String(age) : '-';
+  } catch {
+    return '-';
+  }
+};
+
 export default function PacienteModal({ isOpen, onClose, onSubmit, initialData, isLoading, readOnly = false, isEditing = false, externalErrors = {}, onClearExternalError }) {
   const [formData, setFormData] = useState(() => getInitialFormData(initialData));
   const [errors, setErrors] = useState({});
@@ -190,6 +205,7 @@ export default function PacienteModal({ isOpen, onClose, onSubmit, initialData, 
           {readOnly ? (
             <>
               <ReadRow label="Fecha de Nacimiento:" value={formData.fecha_nacimiento} />
+              <ReadRow label="Edad:" value={(() => { const a = computeAgeFromDate(formData.fecha_nacimiento); return a === '-' ? a : `${a} años`; })()} />
               <ReadRow label="Teléfono:" value={formData.telefono} />
               <ReadRow label="Correo:" value={formData.correo} />
               <ReadRow label="Dirección:" value={formData.direccion} />

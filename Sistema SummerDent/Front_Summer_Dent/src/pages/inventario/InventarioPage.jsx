@@ -1,5 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
+import { useAuthStore } from '../../store/authStore';
 import ConfirmModal from '../../components/ui/ConfirmModal';
+import Button from '../../components/ui/Button';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchProductos, updateProducto, createProducto } from '../../services/api/productos';
 import { createMovimientoFinanzas } from '../../services/api/movimientoFinanzas';
@@ -109,10 +112,24 @@ const buildAlertSummary = (inventoryList) => {
   };
 };
 
+const INVENTARIO_POR_PAGINA = 15;
+
+const STATUS_OPTIONS = [
+  { value: 'todos', label: 'Todos' },
+  { value: 'ok', label: 'Disponible' },
+  { value: 'low', label: 'Stock Bajo' },
+  { value: 'critical', label: 'Stock Crítico' }
+];
+
 export default function InventarioPage() {
   const queryClient = useQueryClient();
+  const user = useAuthStore((s) => s.user);
+  const sedeActiva = useAuthStore((s) => s.sedeActiva);
+  const isSuperadmin = user && user.rol === 'superadmin';
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('todos');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [expandedInventarioId, setExpandedInventarioId] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedInventario, setSelectedInventario] = useState(null);
   const [isViewMode, setIsViewMode] = useState(false);
@@ -128,6 +145,8 @@ export default function InventarioPage() {
   const [movementMetodoPago, setMovementMetodoPago] = useState('efectivo');
   const [movementDetallePago, setMovementDetallePago] = useState('');
   const [movementFieldErrors, setMovementFieldErrors] = useState({});
+  const [isStatusMenuOpen, setIsStatusMenuOpen] = useState(false);
+  const statusSelectorRef = useRef(null);
 
   const resetMovementForm = () => {
     setPendingMovementQty(1);
@@ -183,6 +202,77 @@ export default function InventarioPage() {
       return matchesStatus && matchesDate && matchesSearch;
     });
   }, [inventarios, searchTerm, statusFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredInventarios.length / INVENTARIO_POR_PAGINA));
+
+  const paginatedInventarios = useMemo(() => {
+    const startIndex = (currentPage - 1) * INVENTARIO_POR_PAGINA;
+    return filteredInventarios.slice(startIndex, startIndex + INVENTARIO_POR_PAGINA);
+  }, [currentPage, filteredInventarios]);
+
+  const toggleInventarioDetails = (inventarioId) => {
+    setExpandedInventarioId((currentId) => (currentId === inventarioId ? null : inventarioId));
+  };
+
+  const renderInventarioDetails = (inventario, status) => [
+    { label: 'Precio', value: (() => {
+      const raw = (
+        inventario.precio !== undefined && inventario.precio !== null
+          ? inventario.precio
+          : inventario.producto?.precio
+      );
+      if (raw !== undefined && raw !== null && raw !== '') return formatCurrency(raw);
+      const prodFromList = productos.find((p) => Number(p.id) === Number(inventario.id_producto));
+      if (prodFromList && prodFromList.precio !== undefined && prodFromList.precio !== null && prodFromList.precio !== '') return formatCurrency(prodFromList.precio);
+      return '-';
+    })() },
+    { label: 'Cantidad Actual', value: String(inventario.stock_producto ?? 0) },
+    { label: 'Stock Mínimo', value: String(inventario.stock_minimo ?? 0) },
+    { label: 'Fecha de Caducidad', value: formatDate(inventario.fecha_caducidad) },
+    { label: 'Última Actualización', value: formatDate(getUpdateDate(inventario)) },
+    { label: 'Estado', value: getStatusLabel(inventario.stock_producto, inventario.stock_minimo), status }
+  ];
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter]);
+
+  useEffect(() => {
+    setCurrentPage((page) => Math.min(page, totalPages));
+  }, [totalPages]);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return undefined;
+
+    const handlePointerDown = (event) => {
+      if (!statusSelectorRef.current?.contains(event.target)) {
+        setIsStatusMenuOpen(false);
+      }
+    };
+
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') {
+        setIsStatusMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('touchstart', handlePointerDown);
+    document.addEventListener('keydown', handleEscape);
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('touchstart', handlePointerDown);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, []);
+
+  const activeStatusLabel = STATUS_OPTIONS.find((option) => option.value === statusFilter)?.label || 'Todos';
+
+  const handleStatusChange = (value) => {
+    setStatusFilter(value);
+    setIsStatusMenuOpen(false);
+  };
 
   const openCreateModal = () => {
     setSelectedInventario(null);
@@ -245,6 +335,14 @@ export default function InventarioPage() {
       queryClient.invalidateQueries({ queryKey: ['inventario'] });
       queryClient.invalidateQueries({ queryKey: ['egresos'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-snapshot'] });
+      // Ensure caja/dashboard reflects the new movimiento immediately
+      try {
+        queryClient.invalidateQueries({ queryKey: ['caja-mensual'] });
+        queryClient.invalidateQueries({ queryKey: ['caja-mensual-dashboard'] });
+        queryClient.invalidateQueries({ queryKey: ['caja-mensual-history'] });
+      } catch {
+        // ignore
+      }
       setMovementConfirmOpen(false);
       setPendingMovementInventario(null);
       resetMovementForm();
@@ -323,10 +421,11 @@ export default function InventarioPage() {
               fecha: getLocalDateYYYYMMDD()
             };
 
+            if (sedeActiva) movimientoPayload.sede_id = sedeActiva;
             await createMovimientoFinanzas(movimientoPayload);
-            // refresh egresos and dashboard totals
-            queryClient.invalidateQueries({ queryKey: ['egresos'] });
-            queryClient.invalidateQueries({ queryKey: ['dashboard-snapshot'] });
+            // refresh egresos and dashboard totals (per sede)
+            queryClient.invalidateQueries({ queryKey: ['egresos', sedeActiva] });
+            queryClient.invalidateQueries({ queryKey: ['dashboard-snapshot', sedeActiva] });
           }
         } catch (err) {
           console.error('No se pudo crear egreso automático por disminución de stock:', err);
@@ -369,9 +468,11 @@ export default function InventarioPage() {
           <h1>Gestión de Inventario</h1>
           <p>Controla los insumos y materiales del consultorio</p>
         </div>
-        <button type="button" className="btn btn-primary" onClick={openCreateModal}>
-          + Nuevo Insumo
-        </button>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.75rem' }}>
+          <button type="button" className="btn btn-primary" onClick={openCreateModal}>
+            + Nuevo Insumo
+          </button>
+        </div>
       </div>
 
       {alertSummary && (
@@ -386,39 +487,68 @@ export default function InventarioPage() {
         </section>
       )}
 
-      <div className="inventario-legend">
-        <span><i className="inventario-dot inventario-dot--ok" />Disponible</span>
-        <span><i className="inventario-dot inventario-dot--low" />Stock Bajo</span>
-        <span><i className="inventario-dot inventario-dot--critical" />Stock Crítico</span>
-      </div>
-
       <div className="inventario-filters">
-        <div className="search-container search-container--finance search-container--compact">
-          <svg className="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="11" cy="11" r="8" />
-            <path d="m21 21-4.35-4.35" />
-          </svg>
-          <input
-            type="text"
-            className="search-input"
-            placeholder="Buscar por producto, stock o perfil..."
-            value={searchTerm}
-            onChange={(event) => setSearchTerm(event.target.value)}
-          />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', flex: '1 1 0' }}>
+          <label style={{ fontWeight: 700, fontSize: '0.85rem' }}>Búsqueda</label>
+          <div className="search-container search-container--finance search-container--compact">
+            <svg className="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="11" cy="11" r="8" />
+              <path d="m21 21-4.35-4.35" />
+            </svg>
+            <input
+              type="text"
+              className="search-input"
+              placeholder="Buscar por producto, stock o perfil..."
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+            />
+          </div>
         </div>
 
         {/* date filter removed per user request */}
 
-        <select
-          className="search-input inventario-select"
-          value={statusFilter}
-          onChange={(event) => setStatusFilter(event.target.value)}
-        >
-          <option value="todos">Todos</option>
-          <option value="ok">Disponible</option>
-          <option value="low">Stock Bajo</option>
-          <option value="critical">Stock Crítico</option>
-        </select>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', marginLeft: '0.75rem', flex: '0 0 auto' }}>
+          <label style={{ fontWeight: 700, fontSize: '0.85rem' }}>Stock</label>
+          <div className="inventario-status-selector" ref={statusSelectorRef}>
+            <div className="inventario-status-selector__control">
+              <button
+                type="button"
+                className="inventario-status-selector__trigger"
+                aria-haspopup="listbox"
+                aria-expanded={isStatusMenuOpen}
+                onClick={() => setIsStatusMenuOpen((open) => !open)}
+              >
+                <span className="inventario-status-selector__trigger-text">{activeStatusLabel}</span>
+              </button>
+              <ChevronDown className="inventario-status-selector__chevron" size={18} aria-hidden="true" />
+              {isStatusMenuOpen ? (
+                <div className="inventario-status-selector__menu" role="listbox" aria-label="Selector de stock">
+                  {STATUS_OPTIONS.map((option) => {
+                    const isSelected = option.value === statusFilter;
+
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        role="option"
+                        aria-selected={isSelected}
+                        className={isSelected ? 'inventario-status-selector__item inventario-status-selector__item--active' : 'inventario-status-selector__item'}
+                        onClick={() => handleStatusChange(option.value)}
+                      >
+                        {option.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </div>
+        <div className="inventario-legend">
+          <span><i className="inventario-dot inventario-dot--ok" />Disponible</span>
+          <span><i className="inventario-dot inventario-dot--low" />Stock Bajo</span>
+          <span><i className="inventario-dot inventario-dot--critical" />Stock Crítico</span>
+        </div>
       </div>
 
       {errorMessage && (
@@ -450,21 +580,22 @@ export default function InventarioPage() {
             <p>Prueba cambiando los filtros o registra un nuevo insumo.</p>
           </div>
         ) : (
-          <table className="inventario-table">
-            <thead>
-              <tr>
-                <th>Producto</th>
-                <th>Precio</th>
-                <th className="inventario-col-center">Cantidad Actual</th>
-                <th className="inventario-col-center">Stock Mínimo</th>
-                <th>Fecha de Caducidad</th>
-                <th>Última Actualización</th>
-                <th>Estado</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredInventarios.map((inventario) => {
+          <>
+            <table className="inventario-table">
+              <thead>
+                <tr>
+                  <th>Producto</th>
+                  <th>Precio</th>
+                  <th className="inventario-col-center">Cantidad Actual</th>
+                  <th className="inventario-col-center">Stock Mínimo</th>
+                  <th>Fecha de Caducidad</th>
+                  <th>Última Actualización</th>
+                  <th>Estado</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+              {paginatedInventarios.map((inventario) => {
                 const status = getStatus(inventario.stock_producto, inventario.stock_minimo);
 
                 return (
@@ -509,38 +640,169 @@ export default function InventarioPage() {
                           <circle cx="12" cy="12" r="3" />
                         </svg>
                       </button>
-                      <button
-                        type="button"
-                        className="inventario-action-btn inventario-action-btn--edit"
-                        onClick={() => openEditModal(inventario)}
-                        aria-label="Editar"
-                        title="Editar"
-                      >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                          <path d="M12 20h9" />
-                          <path d="M16.5 3.5a2.12 2.12 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
-                        </svg>
-                      </button>
-                      <button
-                        type="button"
-                        className="inventario-action-btn inventario-action-btn--movement"
-                        onClick={() => handleRegisterMovement(inventario)}
-                        aria-label="Registrar movimiento"
-                        title="Registrar movimiento"
-                      >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                          <path d="M17 1l4 4-4 4" />
-                          <path d="M3 11V9a4 4 0 0 1 4-4h14" />
-                          <path d="M7 23l-4-4 4-4" />
-                          <path d="M21 13v2a4 4 0 0 1-4 4H3" />
-                        </svg>
-                      </button>
+                      {(() => {
+                        const user = useAuthStore.getState().user;
+                        const isSuperadmin = user && user.rol === 'superadmin';
+                        return (
+                          !isSuperadmin && (
+                            <button
+                              type="button"
+                              className="inventario-action-btn inventario-action-btn--edit"
+                              onClick={() => openEditModal(inventario)}
+                              aria-label="Editar"
+                              title="Editar"
+                            >
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                                <path d="M12 20h9" />
+                                <path d="M16.5 3.5a2.12 2.12 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+                              </svg>
+                            </button>
+                          )
+                        );
+                      })()}
+                      {!isSuperadmin && (
+                        <button
+                          type="button"
+                          className="inventario-action-btn inventario-action-btn--movement"
+                          onClick={() => handleRegisterMovement(inventario)}
+                          aria-label="Registrar movimiento"
+                          title="Registrar movimiento"
+                        >
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                            <path d="M17 1l4 4-4 4" />
+                            <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+                            <path d="M7 23l-4-4 4-4" />
+                            <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+                          </svg>
+                        </button>
+                      )}
                     </td>
                   </tr>
                 );
               })}
-            </tbody>
-          </table>
+              </tbody>
+            </table>
+
+            <div className="inventario-mobile-list" aria-label="Tabla de inventario en móvil">
+              {paginatedInventarios.map((inventario) => {
+                const status = getStatus(inventario.stock_producto, inventario.stock_minimo);
+                const isExpanded = expandedInventarioId === inventario.id;
+
+                return (
+                  <article key={inventario.id} className="inventario-mobile-card">
+                    <div className="inventario-mobile-card__summary">
+                      <button
+                        type="button"
+                        className="inventario-mobile-card__summary-toggle"
+                        onClick={() => toggleInventarioDetails(inventario.id)}
+                        aria-expanded={isExpanded}
+                        aria-controls={`inventario-mobile-details-${inventario.id}`}
+                      >
+                        <span className="inventario-mobile-card__toggle" aria-hidden="true">
+                          {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                        </span>
+                      </button>
+
+                      <button
+                        type="button"
+                        className="inventario-mobile-card__summary-main"
+                        onClick={() => toggleInventarioDetails(inventario.id)}
+                        aria-expanded={isExpanded}
+                        aria-controls={`inventario-mobile-details-${inventario.id}`}
+                      >
+                        <span className="inventario-mobile-card__product-label">Producto</span>
+                        <span className="inventario-mobile-card__product-name">
+                          <strong>{getProductName(inventario)}</strong>
+                        </span>
+                      </button>
+
+                      <span className="inventario-mobile-card__summary-actions">
+                        <button
+                          type="button"
+                          className="inventario-action-btn inventario-action-btn--view"
+                          onClick={() => handleViewInventario(inventario)}
+                          aria-label="Ver detalle"
+                          title="Ver detalle"
+                        >
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                            <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" />
+                            <circle cx="12" cy="12" r="3" />
+                          </svg>
+                        </button>
+                        {!isSuperadmin && (
+                          <button
+                            type="button"
+                            className="inventario-action-btn inventario-action-btn--edit"
+                            onClick={() => openEditModal(inventario)}
+                            aria-label="Editar"
+                            title="Editar"
+                          >
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                              <path d="M12 20h9" />
+                              <path d="M16.5 3.5a2.12 2.12 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+                            </svg>
+                          </button>
+                        )}
+                        {!isSuperadmin && (
+                          <button
+                            type="button"
+                            className="inventario-action-btn inventario-action-btn--movement"
+                            onClick={() => handleRegisterMovement(inventario)}
+                            aria-label="Registrar movimiento"
+                            title="Registrar movimiento"
+                          >
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                              <path d="M17 1l4 4-4 4" />
+                              <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+                              <path d="M7 23l-4-4 4-4" />
+                              <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+                            </svg>
+                          </button>
+                        )}
+                      </span>
+                    </div>
+
+                    {isExpanded ? (
+                      <div className="inventario-mobile-card__details" id={`inventario-mobile-details-${inventario.id}`}>
+                        {renderInventarioDetails(inventario, status).map((item) => (
+                          <div key={item.label} className="inventario-mobile-card__row">
+                            <span className="inventario-mobile-card__label">{item.label}</span>
+                            <span className={item.label === 'Estado' ? `inventory-status-badge inventory-status-badge--${status}` : 'inventario-mobile-card__value'}>
+                              {item.value}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+                  </article>
+                );
+              })}
+            </div>
+
+            <div className="finance-pagination">
+              <div className="finance-pagination__info">
+                Mostrando {Math.min(filteredInventarios.length, (currentPage - 1) * INVENTARIO_POR_PAGINA + 1)}-
+                {Math.min(filteredInventarios.length, currentPage * INVENTARIO_POR_PAGINA)} de {filteredInventarios.length}
+              </div>
+              <div className="finance-pagination__controls">
+                <Button
+                  variant="secondary"
+                  onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                  disabled={currentPage <= 1}
+                >
+                  Anterior
+                </Button>
+                <span className="finance-pagination__page">Página {currentPage} de {totalPages}</span>
+                <Button
+                  variant="secondary"
+                  onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                  disabled={currentPage >= totalPages}
+                >
+                  Siguiente
+                </Button>
+              </div>
+            </div>
+          </>
         )}
       </div>
 
@@ -613,6 +875,7 @@ export default function InventarioPage() {
                   <select id="mov_metodo_pago_compra" value={movementMetodoPago} onChange={(e) => setMovementMetodoPago(e.target.value)} style={{ width: '100%', padding: '0.5rem' }}>
                     <option value="efectivo">Efectivo</option>
                     <option value="transferencia">Transferencia</option>
+                    <option value="deposito">Depósito bancario</option>
                     <option value="tarjeta">Tarjeta</option>
                   </select>
                 </div>
@@ -629,6 +892,7 @@ export default function InventarioPage() {
                   <select id="mov_metodo_pago" value={movementMetodoPago} onChange={(e) => setMovementMetodoPago(e.target.value)} style={{ width: '100%', padding: '0.5rem' }}>
                     <option value="efectivo">Efectivo</option>
                     <option value="transferencia">Transferencia</option>
+                    <option value="deposito">Depósito bancario</option>
                     <option value="tarjeta">Tarjeta</option>
                   </select>
                 </div>

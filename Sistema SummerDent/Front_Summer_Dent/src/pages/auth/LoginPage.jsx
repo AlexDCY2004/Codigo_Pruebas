@@ -14,8 +14,17 @@ export default function LoginPage() {
   const [errorMessage, setErrorMessage] = useState('');
 
   const handleChange = (event) => {
-    const { name, value } = event.target;
+    const { name, value: rawValue } = event.target;
+    let value = rawValue;
+    // enforce max lengths: usuario/email 32, password 20
+    if (name === 'email') {
+      value = String(value || '').slice(0, 32);
+    }
+    if (name === 'password') {
+      value = String(value || '').slice(0, 20);
+    }
     setForm((prev) => ({ ...prev, [name]: value }));
+    if (errorMessage) setErrorMessage('');
   };
 
   const handleSubmit = async (event) => {
@@ -62,7 +71,7 @@ export default function LoginPage() {
         <div className="login-brand">
           <img src={logoImage} alt="Logo Summer Dent" className="login-logo" />
           <h1>Summer Dent</h1>
-          <p>Sistema de Gestión Dental</p>
+          <p style={{ fontSize: '1rem', fontWeight: 700 }}>Sonríe al sol y brilla todo el año</p>
         </div>
 
         <div className="login-form-grid">

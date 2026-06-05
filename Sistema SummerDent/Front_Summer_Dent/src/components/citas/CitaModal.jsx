@@ -75,6 +75,32 @@ const getInitialFormData = (initialData, tratamientos) => {
 const OPEN_TIME = '08:00';
 const CLOSE_TIME = '20:00';
 
+const getLocalDateYYYYMMDD = (date = new Date()) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const getDateOffsetMonths = (months) => {
+  const date = new Date();
+  date.setHours(0, 0, 0, 0);
+  date.setMonth(date.getMonth() + months);
+  return getLocalDateYYYYMMDD(date);
+};
+
+const getCitaDateWindow = () => ({
+  minDate: getDateOffsetMonths(-2),
+  maxDate: getDateOffsetMonths(3)
+});
+
+const isFechaCitaWithinWindow = (fecha) => {
+  if (!fecha) return false;
+  const value = String(fecha).split('T')[0];
+  const { minDate, maxDate } = getCitaDateWindow();
+  return value >= minDate && value <= maxDate;
+};
+
 const getInitialPacienteQuery = (initialData, pacientes) => {
   if (!initialData?.id_paciente) return '';
   const found = (pacientes || []).find((item) => String(item.id_cedula) === String(initialData.id_paciente));
@@ -210,25 +236,13 @@ export default function CitaModal({ isOpen, onClose, onSubmit, initialData, isLo
     }
     if (!formData.fecha) newErrors.fecha = 'Fecha requerida';
     else {
-      // bloquear fechas anteriores a hoy y más de 10 días en el futuro
+      // bloquear fechas fuera de la ventana permitida: 2 meses antes y 3 meses después de hoy
       try {
-        const todayDate = new Date();
-        const y = todayDate.getFullYear();
-        const m = String(todayDate.getMonth() + 1).padStart(2, '0');
-        const day = String(todayDate.getDate()).padStart(2, '0');
-        const today = `${y}-${m}-${day}`;
+        const { minDate, maxDate } = getCitaDateWindow();
+        const fechaValue = String(formData.fecha).split('T')[0];
 
-        const maxDateObj = new Date(todayDate);
-        maxDateObj.setDate(maxDateObj.getDate() + 10);
-        const my = maxDateObj.getFullYear();
-        const mm = String(maxDateObj.getMonth() + 1).padStart(2, '0');
-        const mdd = String(maxDateObj.getDate()).padStart(2, '0');
-        const maxDate = `${my}-${mm}-${mdd}`;
-
-        if (String(formData.fecha) < today) {
-          newErrors.fecha = 'La fecha no puede ser anterior a hoy';
-        } else if (String(formData.fecha) > maxDate) {
-          newErrors.fecha = 'La fecha no puede ser mayor a 10 días desde hoy';
+        if (fechaValue < minDate || fechaValue > maxDate) {
+          newErrors.fecha = `La fecha debe estar entre ${minDate} y ${maxDate}`;
         }
       } catch {
         // ignore parsing errors, other validations will catch invalid formats
@@ -276,23 +290,11 @@ export default function CitaModal({ isOpen, onClose, onSubmit, initialData, isLo
       if (!formData.fecha) newErrors.fecha = 'Fecha requerida';
       else {
         try {
-          const todayDate = new Date();
-          const y = todayDate.getFullYear();
-          const m = String(todayDate.getMonth() + 1).padStart(2, '0');
-          const day = String(todayDate.getDate()).padStart(2, '0');
-          const today = `${y}-${m}-${day}`;
+          const { minDate, maxDate } = getCitaDateWindow();
+          const fechaValue = String(formData.fecha).split('T')[0];
 
-          const maxDateObj = new Date(todayDate);
-          maxDateObj.setDate(maxDateObj.getDate() + 10);
-          const my = maxDateObj.getFullYear();
-          const mm = String(maxDateObj.getMonth() + 1).padStart(2, '0');
-          const mdd = String(maxDateObj.getDate()).padStart(2, '0');
-          const maxDate = `${my}-${mm}-${mdd}`;
-
-          if (String(formData.fecha) < today) {
-            newErrors.fecha = 'La fecha no puede ser anterior a hoy';
-          } else if (String(formData.fecha) > maxDate) {
-            newErrors.fecha = 'La fecha no puede ser mayor a 10 días desde hoy';
+          if (fechaValue < minDate || fechaValue > maxDate) {
+            newErrors.fecha = `La fecha debe estar entre ${minDate} y ${maxDate}`;
           } else {
             delete newErrors.fecha;
           }
@@ -588,6 +590,8 @@ export default function CitaModal({ isOpen, onClose, onSubmit, initialData, isLo
                     onChange={handleChange}
                     onBlur={() => validateField('fecha')}
                     className={errors.fecha ? 'input-error' : ''}
+                    min={getCitaDateWindow().minDate}
+                    max={getCitaDateWindow().maxDate}
                   />
                   {errors.fecha && <span className="error-text">{errors.fecha}</span>}
 
@@ -692,6 +696,7 @@ export default function CitaModal({ isOpen, onClose, onSubmit, initialData, isLo
                           <select id="metodo_pago" value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} style={{ width: '100%', padding: '0.5rem' }}>
                             <option value="efectivo">Efectivo</option>
                             <option value="transferencia">Transferencia</option>
+                            <option value="deposito">Depósito bancario</option>
                             <option value="tarjeta">Tarjeta</option>
                           </select>
                           {paymentErrors.metodo && <span className="error-text">{paymentErrors.metodo}</span>}

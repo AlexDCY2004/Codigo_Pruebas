@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import ConfirmModal from '../../components/ui/ConfirmModal';
+import Button from '../../components/ui/Button';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchPacientes, createPaciente, updatePaciente, deletePaciente } from '../../services/api/pacientes';
 import PacientesTable from '../../components/pacientes/PacientesTable';
@@ -7,9 +8,12 @@ import PacienteModal from '../../components/pacientes/PacienteModal';
 import ErrorState from '../../components/feedback/ErrorState';
 import LoadingState from '../../components/feedback/LoadingState';
 
+const PACIENTES_POR_PAGINA = 15;
+
 export default function PacientesPage() {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedPaciente, setSelectedPaciente] = useState(null);
   const [modalMode, setModalMode] = useState('create'); // 'create' | 'edit' | 'view'
@@ -26,12 +30,29 @@ export default function PacientesPage() {
     queryFn: fetchPacientes
   });
 
-  const filteredPacientes = pacientes.filter(p => {
-    const fullName = `${p.nombre} ${p.apellido}`.toLowerCase();
-    const cedula = (p.id_cedula || '').toString();
+  const filteredPacientes = useMemo(() => {
     const search = searchTerm.toLowerCase();
-    return fullName.includes(search) || cedula.includes(search);
-  });
+    return pacientes.filter((p) => {
+      const fullName = `${p.nombre} ${p.apellido}`.toLowerCase();
+      const cedula = (p.id_cedula || '').toString();
+      return fullName.includes(search) || cedula.includes(search);
+    });
+  }, [pacientes, searchTerm]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredPacientes.length / PACIENTES_POR_PAGINA));
+
+  const paginatedPacientes = useMemo(() => {
+    const startIndex = (currentPage - 1) * PACIENTES_POR_PAGINA;
+    return filteredPacientes.slice(startIndex, startIndex + PACIENTES_POR_PAGINA);
+  }, [currentPage, filteredPacientes]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    setCurrentPage((page) => Math.min(page, totalPages));
+  }, [totalPages]);
 
 const handleClearFieldError = (field) => {
   setModalFieldErrors(prev => ({ ...prev, [field]: '' }));
@@ -169,36 +190,67 @@ const handleClearFieldError = (field) => {
         </div>
       )}
 
-      <div className="search-container">
-        <svg
-          className="search-icon"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-        >
-          <circle cx="11" cy="11" r="8" />
-          <path d="m21 21-4.35-4.35" />
-        </svg>
-        <input
-          type="text"
-          className="search-input"
-          placeholder="Buscar por nombre o cédula..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+        <label style={{ fontWeight: 700, fontSize: '0.85rem' }}>Búsqueda</label>
+        <div className="search-container">
+          <svg
+            className="search-icon"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
+            <circle cx="11" cy="11" r="8" />
+            <path d="m21 21-4.35-4.35" />
+          </svg>
+          <input
+            type="text"
+            className="search-input"
+            placeholder="Buscar por nombre o cédula..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
       </div>
 
       {isLoading ? (
         <LoadingState />
       ) : (
-        <PacientesTable
-          pacientes={filteredPacientes}
-          onEdit={handleEditPaciente}
-          onDelete={handleDeletePaciente}
-          onView={handleViewPaciente}
-          isLoading={false}
-        />
+        <>
+          <PacientesTable
+            pacientes={paginatedPacientes}
+            onEdit={handleEditPaciente}
+            onDelete={handleDeletePaciente}
+            onView={handleViewPaciente}
+            isLoading={false}
+          />
+
+          {filteredPacientes.length > 0 && (
+            <div className="finance-pagination">
+              <div className="finance-pagination__info">
+                Mostrando {Math.min(filteredPacientes.length, (currentPage - 1) * PACIENTES_POR_PAGINA + 1)}-
+                {Math.min(filteredPacientes.length, currentPage * PACIENTES_POR_PAGINA)} de {filteredPacientes.length}
+              </div>
+              <div className="finance-pagination__controls">
+                <Button
+                  variant="secondary"
+                  onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                  disabled={currentPage <= 1}
+                >
+                  Anterior
+                </Button>
+                <span className="finance-pagination__page">Página {currentPage} de {totalPages}</span>
+                <Button
+                  variant="secondary"
+                  onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                  disabled={currentPage >= totalPages}
+                >
+                  Siguiente
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       <PacienteModal

@@ -8,7 +8,8 @@ const ALLOWED_AREAS = [
   'Cirugía Odontológica',
   'Endodoncia',
   'Prótesis Removible Valplast o Flexible',
-  'Acrílicas'
+  'Acrílicas',
+  'Prótesis Cromo Cobalto'
 ];
 
 export const Tratamiento = sequelize.define(

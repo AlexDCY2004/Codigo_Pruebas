@@ -58,7 +58,7 @@ export const crearDoctorController = async (req, res) => {
         }
 
         if (!esTextoValido(nombre, 2, 64)) {
-            return res.status(400).json({ error: 'El nombre debe tener entre 2 y 64 caracteres validos' });
+            return res.status(400).json({ error: 'El nombre debe tener entre 2 y 64 caracteres' });
         }
 
         if (!esNombreValido(nombre)) {
@@ -70,7 +70,7 @@ export const crearDoctorController = async (req, res) => {
         }
 
         if (!esTextoValido(especialidad, 2, 64)) {
-            return res.status(400).json({ error: 'La especialidad debe tener entre 2 y 64 caracteres validos' });
+            return res.status(400).json({ error: 'La especialidad debe tener entre 2 y 64 caracteres' });
         }
 
         if (!esTelefonoValido(telefono)) {
@@ -104,7 +104,12 @@ export const crearDoctorController = async (req, res) => {
         const { data, error } = await supabaseUser.from('doctor').insert([insertObj]).select().single();
 
         if (error) {
-            return res.status(400).json({ error: error.message || error });
+            const errMsg = String(error?.message || '');
+            const errCode = String(error?.code || '');
+            if (errCode === '23505' || errMsg.includes('doctor_correo_key')) {
+                return res.status(409).json({ error: 'Este correo ya se encuentra agregado' });
+            }
+            return res.status(400).json({ error: errMsg || error });
         }
 
         return res.status(201).json({ mensaje: 'Doctor creado exitosamente', doctor: data });
@@ -192,10 +197,10 @@ export const actualizarDoctorController = async (req, res) => {
             return res.status(400).json({ error: `Campos no permitidos: ${camposNoPermitidos.join(', ')}` });
         }
 
-        if (nombre !== undefined && !esTextoValido(nombre, 2, 64)) return res.status(400).json({ error: 'El nombre debe tener entre 2 y 64 caracteres validos' });
+        if (nombre !== undefined && !esTextoValido(nombre, 2, 64)) return res.status(400).json({ error: 'El nombre debe tener entre 2 y 64 caracteres' });
         if (nombre !== undefined && !esNombreValido(nombre)) return res.status(400).json({ error: 'El nombre solo debe contener letras, espacios y puntos' });
         if (correo !== undefined && !esCorreoValido(correo)) return res.status(400).json({ error: 'El correo debe tener formato valido y entre 5 y 64 caracteres' });
-        if (especialidad !== undefined && !esTextoValido(especialidad, 2, 64)) return res.status(400).json({ error: 'La especialidad debe tener entre 2 y 64 caracteres validos' });
+        if (especialidad !== undefined && !esTextoValido(especialidad, 2, 64)) return res.status(400).json({ error: 'La especialidad debe tener entre 2 y 64 caracteres' });
         if (telefono !== undefined && !esTelefonoValido(telefono)) return res.status(400).json({ error: 'El telefono debe contener solo digitos, tener exactamente 10 caracteres y no puede tener más de 3 dígitos iguales consecutivos' });
         if (estado !== undefined && typeof estado !== 'string') return res.status(400).json({ error: 'El estado debe ser texto' });
 
@@ -223,7 +228,14 @@ export const actualizarDoctorController = async (req, res) => {
             .select()
             .maybeSingle();
 
-        if (error) return res.status(400).json({ error: error.message || error });
+        if (error) {
+            const errMsg = String(error?.message || '');
+            const errCode = String(error?.code || '');
+            if (errCode === '23505' || errMsg.includes('doctor_correo_key')) {
+                return res.status(409).json({ error: 'Este correo ya se encuentra agregado' });
+            }
+            return res.status(400).json({ error: errMsg || error });
+        }
         if (!data) return res.status(404).json({ error: 'Doctor no encontrado' });
 
         return res.json({ mensaje: 'Doctor actualizado exitosamente', doctor: data });

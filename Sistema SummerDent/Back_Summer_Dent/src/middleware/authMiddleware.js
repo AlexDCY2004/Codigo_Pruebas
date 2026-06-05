@@ -16,7 +16,7 @@ export const verifyToken = (req, res, next) => {
   }
 
   try {
-    if (!jwtSecret) throw new Error('JWT secret no configurado');
+    if (!jwtSecret) throw new Error('JWT secret no configurado correctamente');
     const payload = jwt.verify(token, jwtSecret, { algorithms: ['HS256'] });
     req.user = payload; // payload.sub is el user id en Supabase
     return next();

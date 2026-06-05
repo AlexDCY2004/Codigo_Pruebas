@@ -16,8 +16,8 @@ export const Producto = sequelize.define(
             validate: {
                 notEmpty: { msg: 'El nombre del producto es obligatorio' },
                 len: {
-                    args: [2, 150],
-                    msg: 'El nombre debe tener entre 2 y 150 caracteres'
+                    args: [2, 32],
+                    msg: 'El nombre debe tener entre 2 y 32 caracteres'
                 }
             }
         },

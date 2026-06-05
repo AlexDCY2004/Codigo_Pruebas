@@ -1,4 +1,6 @@
-import { Eye, Edit2, Trash2 } from 'lucide-react';
+import { useState } from 'react';
+import { ChevronDown, ChevronUp, Eye, Edit2, Trash2 } from 'lucide-react';
+import { useAuthStore } from '../../store/authStore';
 
 const formatLocalDate = (dateValue) => {
   if (!dateValue) return '-';
@@ -38,6 +40,10 @@ const getEstadoBadgeClass = (estado) => {
 };
 
 export default function CitasTable({ citas, pacientes = [], doctores = [], tratamientos = [], onEdit, onDelete, onView, isLoading }) {
+  const user = useAuthStore((s) => s.user);
+  const isSuperadmin = user && user.rol === 'superadmin';
+  const [expandedCitaId, setExpandedCitaId] = useState(null);
+
   const resolvePacienteNombre = (cita, pacientes = []) => {
     if (cita.paciente?.nombre) {
       return `${cita.paciente.nombre} ${cita.paciente.apellido}`.trim();
@@ -83,6 +89,60 @@ export default function CitasTable({ citas, pacientes = [], doctores = [], trata
 
     return ['-'];
   };
+
+  const toggleCitaDetails = (citaId) => {
+    setExpandedCitaId((currentId) => (currentId === citaId ? null : citaId));
+  };
+
+  const renderCitaActions = (cita) => (
+    <div className="table-actions table-actions--mobile">
+      <button
+        type="button"
+        onClick={() => onView(cita)}
+        className="action-btn action-btn--view"
+        title="Ver detalles"
+      >
+        <Eye size={16} />
+      </button>
+      {!isSuperadmin && (
+        <>
+          <button
+            type="button"
+            onClick={() => onEdit(cita)}
+            className="action-btn action-btn--edit"
+            title="Editar"
+          >
+            <Edit2 size={16} />
+          </button>
+          <button
+            type="button"
+            onClick={() => onDelete(cita)}
+            className="action-btn action-btn--delete"
+            title="Eliminar"
+          >
+            <Trash2 size={16} />
+          </button>
+        </>
+      )}
+    </div>
+  );
+
+  const renderCitaDetails = (cita, pacienteNombre, doctorNombre, tratamientoNombres, isAttended) => [
+    { label: 'Fecha', value: formatLocalDate(cita.fecha) },
+    { label: 'Hora Inicio', value: cita.hora_inicio || '-' },
+    { label: 'Hora Fin', value: cita.hora_fin || '-' },
+    { label: 'Odontólogo', value: doctorNombre },
+    { label: 'Tratamiento', value: tratamientoNombres.join(', ') },
+    { label: 'Estado', value: cita.estado || 'Sin especificar' },
+    { label: 'Atendido', value: isAttended ? 'Sí' : 'No' },
+    {
+      label: 'Monto',
+      value: new Intl.NumberFormat('es-EC', {
+        style: 'currency',
+        currency: 'USD'
+      }).format(cita.precio || 0)
+    }
+  ];
 
   if (isLoading) {
     return (
@@ -180,28 +240,80 @@ export default function CitasTable({ citas, pacientes = [], doctores = [], trata
                   >
                     <Eye size={16} />
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => onEdit(cita)}
-                    className="action-btn action-btn--edit"
-                    title="Editar"
-                  >
-                    <Edit2 size={16} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onDelete(cita)}
-                    className="action-btn action-btn--delete"
-                    title="Eliminar"
-                  >
-                    <Trash2 size={16} />
-                  </button>
+                  {!isSuperadmin && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => onEdit(cita)}
+                        className="action-btn action-btn--edit"
+                        title="Editar"
+                      >
+                        <Edit2 size={16} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onDelete(cita)}
+                        className="action-btn action-btn--delete"
+                        title="Eliminar"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </>
+                  )}
                 </td>
               </tr>
             );
           })}
         </tbody>
       </table>
+
+      <div className="citas-mobile-list" aria-label="Tabla de citas en móvil">
+        {citas.map((cita) => {
+          const isAttended = cita.estado?.toLowerCase() === 'atendida';
+          const pacienteNombre = resolvePacienteNombre(cita, pacientes);
+          const doctorNombre = resolveDoctorNombre(cita, doctores);
+          const tratamientoNombres = resolveTratamientos(cita, tratamientos);
+          const isExpanded = expandedCitaId === cita.id;
+
+          return (
+            <article key={cita.id} className="citas-mobile-card">
+              <button
+                type="button"
+                className="citas-mobile-card__summary"
+                onClick={() => toggleCitaDetails(cita.id)}
+                aria-expanded={isExpanded}
+                aria-controls={`cita-mobile-details-${cita.id}`}
+              >
+                <span className="citas-mobile-card__toggle" aria-hidden="true">
+                  {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                </span>
+
+                <span className="citas-mobile-card__summary-main">
+                  <span className="citas-mobile-card__patient-label">Paciente</span>
+                  <span className="citas-mobile-card__patient-name">
+                    <strong>{pacienteNombre}</strong>
+                  </span>
+                </span>
+
+                <span className="citas-mobile-card__summary-actions" onClick={(event) => event.stopPropagation()}>
+                  {renderCitaActions(cita)}
+                </span>
+              </button>
+
+              {isExpanded ? (
+                <div className="citas-mobile-card__details" id={`cita-mobile-details-${cita.id}`}>
+                  {renderCitaDetails(cita, pacienteNombre, doctorNombre, tratamientoNombres, isAttended).map((item) => (
+                    <div key={item.label} className="citas-mobile-card__row">
+                      <span className="citas-mobile-card__label">{item.label}</span>
+                      <span className="citas-mobile-card__value">{item.value}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </article>
+          );
+        })}
+      </div>
     </div>
   );
 }

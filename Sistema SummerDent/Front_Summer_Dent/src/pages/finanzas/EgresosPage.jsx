@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
-import { Eye, Edit2 } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronDown, ChevronUp, Eye, Edit2 } from 'lucide-react';
+import { useAuthStore } from '../../store/authStore';
 import ConfirmModal from '../../components/ui/ConfirmModal';
 import Button from '../../components/ui/Button';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -26,6 +27,16 @@ const initialFormState = {
   metodo_pago: 'efectivo',
   fecha: getTodayInputDate()
 };
+
+const MOVIMIENTOS_POR_PAGINA = 15;
+
+const METODO_PAGO_OPTIONS = [
+  { value: '', label: 'Todos' },
+  { value: 'efectivo', label: 'Efectivo' },
+  { value: 'transferencia', label: 'Transferencia' },
+  { value: 'deposito', label: 'Depósito' },
+  { value: 'tarjeta', label: 'Tarjeta' }
+];
 
 const formatCurrency = (value) => new Intl.NumberFormat('es-EC', {
   style: 'currency',
@@ -113,20 +124,28 @@ const getDoctorLabel = (movimiento) => {
 
 export default function EgresosPage() {
   const queryClient = useQueryClient();
+  const user = useAuthStore((state) => state.user);
   const [searchTerm, setSearchTerm] = useState('');
   const [desde, setDesde] = useState('');
   const [hasta, setHasta] = useState('');
   const [metodoPago, setMetodoPago] = useState('');
+  const [isMetodoMenuOpen, setIsMetodoMenuOpen] = useState(false);
+  const metodoSelectorRef = useRef(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [expandedEgresoId, setExpandedEgresoId] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isMobileView, setIsMobileView] = useState(false);
   const [selectedEgreso, setSelectedEgreso] = useState(null);
   const [isViewMode, setIsViewMode] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [formData, setFormData] = useState(initialFormState);
   const [formErrors, setFormErrors] = useState({});
+  const sedeActiva = useAuthStore((s) => s.sedeActiva);
+
   const { data: egresos = [], isLoading, isError, refetch } = useQuery({
-    queryKey: ['egresos', desde, hasta, metodoPago],
-    queryFn: () => fetchEgresos({ desde: desde || undefined, hasta: hasta || undefined, metodo_pago: metodoPago || undefined })
+    queryKey: ['egresos', sedeActiva, desde, hasta, metodoPago],
+    queryFn: () => fetchEgresos({ desde: desde || undefined, hasta: hasta || undefined, metodo_pago: metodoPago || undefined, sede_id: sedeActiva || undefined })
   });
 
   const { data: doctores = [], isLoading: isDoctoresLoading } = useQuery({
@@ -164,6 +183,87 @@ export default function EgresosPage() {
       return matchesSearch && matchesDate && matchesMetodo;
     });
   }, [desde, hasta, egresos, searchTerm, metodoPago]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredEgresos.length / MOVIMIENTOS_POR_PAGINA));
+
+  const isSuperadmin = user && user.rol === 'superadmin';
+
+  const paginatedEgresos = useMemo(() => {
+    const startIndex = (currentPage - 1) * MOVIMIENTOS_POR_PAGINA;
+    return filteredEgresos.slice(startIndex, startIndex + MOVIMIENTOS_POR_PAGINA);
+  }, [currentPage, filteredEgresos]);
+
+  const toggleEgresoDetails = (egresoId) => {
+    setExpandedEgresoId((currentId) => (currentId === egresoId ? null : egresoId));
+  };
+
+  const renderEgresoActions = (egreso) => (
+    <div className="table-actions table-actions--mobile">
+      <button type="button" onClick={() => handleViewEgreso(egreso)} className="action-btn action-btn--view" title="Ver detalles">
+        <Eye size={16} />
+      </button>
+      {!isSuperadmin && (
+        <button type="button" onClick={() => openEditModal(egreso)} className="action-btn action-btn--edit" title="Editar">
+          <Edit2 size={16} />
+        </button>
+      )}
+    </div>
+  );
+
+  const renderEgresoDetails = (egreso) => [
+    { label: 'Doctor', value: getDoctorLabel(egreso) },
+    { label: 'Monto', value: formatCurrency(egreso.monto) },
+    { label: 'Descripción', value: egreso.descripcion || '-' },
+    { label: 'Fecha Registro', value: formatDate(egreso.fecha) }
+  ];
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [desde, hasta, searchTerm, metodoPago]);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobileView(window.innerWidth <= 720);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  useEffect(() => {
+    setCurrentPage((page) => Math.min(page, totalPages));
+  }, [totalPages]);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return undefined;
+
+    const handlePointerDown = (event) => {
+      if (!metodoSelectorRef.current?.contains(event.target)) {
+        setIsMetodoMenuOpen(false);
+      }
+    };
+
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') {
+        setIsMetodoMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('touchstart', handlePointerDown);
+    document.addEventListener('keydown', handleEscape);
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('touchstart', handlePointerDown);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, []);
+
+  const activeMetodoLabel = METODO_PAGO_OPTIONS.find((option) => option.value === metodoPago)?.label || 'Todos';
+
+  const handleMetodoChange = (value) => {
+    setMetodoPago(value);
+    setIsMetodoMenuOpen(false);
+  };
 
   const openCreateModal = () => {
     setSelectedEgreso(null);
@@ -281,6 +381,8 @@ export default function EgresosPage() {
       fecha: formData.fecha || undefined
     };
 
+    if (sedeActiva) payload.sede_id = sedeActiva;
+
     try {
       if (selectedEgreso?.id) {
         await updateMovimientoFinanzas(selectedEgreso.id, payload);
@@ -291,7 +393,11 @@ export default function EgresosPage() {
       setIsModalOpen(false);
       setSelectedEgreso(null);
       setFormData(initialFormState);
-      queryClient.invalidateQueries({ queryKey: ['egresos'] });
+      queryClient.invalidateQueries({ queryKey: ['egresos', sedeActiva] });
+      // actualizar cache de caja mensual para que refleje los movimientos recientes
+      queryClient.invalidateQueries({ queryKey: ['caja-mensual', sedeActiva] });
+      queryClient.invalidateQueries({ queryKey: ['caja-mensual-history', sedeActiva] });
+      queryClient.invalidateQueries({ queryKey: ['caja-mensual-dashboard', sedeActiva] });
     } catch (error) {
       setErrorMessage(error.response?.data?.error || 'No se pudo guardar el egreso.');
     } finally {
@@ -318,34 +424,69 @@ export default function EgresosPage() {
       <div className="finance-summary-grid">
         <section className="finance-filter-card">
           <h3>Filtrar por rango</h3>
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-            <input
-              type="date"
-              className="search-input finance-date-input"
-              value={desde}
-              onChange={(event) => setDesde(event.target.value)}
-              placeholder="Desde"
-            />
-            <span style={{ fontSize: '0.9rem' }}>—</span>
-            <input
-              type="date"
-              className="search-input finance-date-input"
-              value={hasta}
-              onChange={(event) => setHasta(event.target.value)}
-              placeholder="Hasta"
-            />
-            <Button variant="secondary" onClick={() => { setDesde(''); setHasta(''); }} style={{ marginLeft: '0.5rem' }}>Limpiar</Button>
+          <div className="finance-range-row">
+            <div className="finance-range-field">
+              <label style={{ fontSize: '0.85rem', marginBottom: '0.25rem', fontWeight: 700 }}>Desde</label>
+              <input
+                type="date"
+                className="search-input finance-date-input"
+                value={desde}
+                onChange={(event) => setDesde(event.target.value)}
+                placeholder="Desde"
+              />
+            </div>
+
+            <div className="finance-range-field">
+              <label style={{ fontSize: '0.85rem', marginBottom: '0.25rem', fontWeight: 700 }}>Hasta</label>
+              <input
+                type="date"
+                className="search-input finance-date-input"
+                value={hasta}
+                onChange={(event) => setHasta(event.target.value)}
+                placeholder="Hasta"
+              />
+            </div>
+
+            <Button variant="secondary" onClick={() => { setDesde(''); setHasta(''); }} className="finance-range-actions">Limpiar</Button>
           </div>
 
           <div style={{ marginTop: '0.75rem' }}>
-            <h3 style={{ margin: 0, fontSize: '1rem' }}>Método de pago</h3>
-              <div style={{ marginTop: '0.5rem' }}>
-              <select value={metodoPago} onChange={(e) => setMetodoPago(e.target.value)} className="">
-                <option value="">Todos</option>
-                <option value="efectivo">Efectivo</option>
-                <option value="transferencia">Transferencia</option>
-                <option value="tarjeta">Tarjeta</option>
-              </select>
+            <h3 style={{ margin: 0, fontSize: '0.85rem' }}>Método de pago</h3>
+            <div style={{ marginTop: '0.5rem' }}>
+              <div className="finance-method-selector sede-selector" ref={metodoSelectorRef} style={{ width: '100%', flex: '1 1 auto' }}>
+                <div className="finance-method-selector__control">
+                  <button
+                    type="button"
+                    className="finance-method-selector__trigger"
+                    aria-haspopup="listbox"
+                    aria-expanded={isMetodoMenuOpen}
+                    onClick={() => setIsMetodoMenuOpen((open) => !open)}
+                  >
+                    <span className="finance-method-selector__trigger-text">{activeMetodoLabel}</span>
+                  </button>
+                  <ChevronDown className="finance-method-selector__chevron" size={18} aria-hidden="true" />
+                  {isMetodoMenuOpen ? (
+                    <div className="finance-method-selector__menu" role="listbox" aria-label="Selector de método de pago">
+                      {METODO_PAGO_OPTIONS.map((option) => {
+                        const isSelected = option.value === metodoPago;
+
+                        return (
+                          <button
+                            key={option.value || 'todos'}
+                            type="button"
+                            role="option"
+                            aria-selected={isSelected}
+                            className={isSelected ? 'sede-selector__item sede-selector__item--active' : 'sede-selector__item'}
+                            onClick={() => handleMetodoChange(option.value)}
+                          >
+                            {option.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
             </div>
           </div>
         </section>
@@ -398,33 +539,118 @@ export default function EgresosPage() {
             <p>Prueba ajustando el filtro de fecha o agrega un nuevo egreso.</p>
           </div>
         ) : (
-          <table className="ingresos-table egresos-table">
-            <thead>
-              <tr>
-                <th>Doctor</th>
-                <th>Método de pago</th>
-                <th>Monto</th>
-                <th>Descripción</th>
-                <th>Fecha Registro</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredEgresos.map((egreso) => (
-                <tr key={egreso.id}>
-                  <td>{getDoctorLabel(egreso)}</td>
-                  <td>{egreso.metodo_pago || '-'}</td>
-                  <td className="finance-amount finance-amount--expense">{formatCurrency(egreso.monto)}</td>
-                  <td className="finance-description">{egreso.descripcion || '-'}</td>
-                  <td>{formatDate(egreso.fecha)}</td>
-                  <td className="table-actions">
-                    <button type="button" onClick={() => handleViewEgreso(egreso)} className="action-btn action-btn--view" title="Ver detalles"><Eye size={16} /></button>
-                    <button type="button" onClick={() => openEditModal(egreso)} className="action-btn action-btn--edit" title="Editar"><Edit2 size={16} /></button>
-                  </td>
+          <>
+            <table className="ingresos-table egresos-table">
+              <thead>
+                <tr>
+                  <th>Doctor</th>
+                  <th>Método de pago</th>
+                  <th>Monto</th>
+                  <th>Descripción</th>
+                  <th>Fecha Registro</th>
+                  <th>Acciones</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {paginatedEgresos.map((egreso) => (
+                  <tr key={egreso.id}>
+                    <td>{getDoctorLabel(egreso)}</td>
+                    <td>{egreso.metodo_pago || '-'}</td>
+                    <td className="finance-amount finance-amount--expense">{formatCurrency(egreso.monto)}</td>
+                    <td className="finance-description">{egreso.descripcion || '-'}</td>
+                    <td>{formatDate(egreso.fecha)}</td>
+                    <td className="table-actions">
+                      {(() => {
+                        const user = useAuthStore.getState().user;
+                        const isSuperadmin = user && user.rol === 'superadmin';
+                        return (
+                          <>
+                            <button type="button" onClick={() => handleViewEgreso(egreso)} className="action-btn action-btn--view" title="Ver detalles"><Eye size={16} /></button>
+                            {!isSuperadmin && (
+                              <button type="button" onClick={() => openEditModal(egreso)} className="action-btn action-btn--edit" title="Editar"><Edit2 size={16} /></button>
+                            )}
+                          </>
+                        );
+                      })()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            {isMobileView && (
+              <div className="egresos-mobile-list" aria-label="Tabla de egresos en móvil">
+                {paginatedEgresos.map((egreso) => {
+                const isExpanded = expandedEgresoId === egreso.id;
+
+                return (
+                  <article key={egreso.id} className="egresos-mobile-card">
+                      <div
+                        className="egresos-mobile-card__summary"
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => toggleEgresoDetails(egreso.id)}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleEgresoDetails(egreso.id); } }}
+                        aria-expanded={isExpanded}
+                        aria-controls={`egreso-mobile-details-${egreso.id}`}
+                      >
+                      <span className="egresos-mobile-card__toggle" aria-hidden="true">
+                        {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                      </span>
+
+                      <span className="egresos-mobile-card__summary-main">
+                        <span className="egresos-mobile-card__method-label">Método de pago</span>
+                        <span className="egresos-mobile-card__method-value">
+                          <strong>{egreso.metodo_pago || '-'}</strong>
+                        </span>
+                        <span className="egresos-mobile-card__type-chip">Tipo: Egreso</span>
+                      </span>
+
+                      <span className="egresos-mobile-card__summary-actions" onClick={(event) => event.stopPropagation()}>
+                        {renderEgresoActions(egreso)}
+                      </span>
+                    </div>
+
+                    {isExpanded ? (
+                      <div className="egresos-mobile-card__details" id={`egreso-mobile-details-${egreso.id}`}>
+                        {renderEgresoDetails(egreso).map((item) => (
+                          <div key={item.label} className="egresos-mobile-card__row">
+                            <span className="egresos-mobile-card__label">{item.label}</span>
+                            <span className="egresos-mobile-card__value">{item.value}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+                  </article>
+                );
+              })}
+              </div>
+            )}
+
+            <div className="finance-pagination">
+              <div className="finance-pagination__info">
+                Mostrando {Math.min(filteredEgresos.length, (currentPage - 1) * MOVIMIENTOS_POR_PAGINA + 1)}-
+                {Math.min(filteredEgresos.length, currentPage * MOVIMIENTOS_POR_PAGINA)} de {filteredEgresos.length}
+              </div>
+              <div className="finance-pagination__controls">
+                <Button
+                  variant="secondary"
+                  onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                  disabled={currentPage <= 1}
+                >
+                  Anterior
+                </Button>
+                <span className="finance-pagination__page">Página {currentPage} de {totalPages}</span>
+                <Button
+                  variant="secondary"
+                  onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                  disabled={currentPage >= totalPages}
+                >
+                  Siguiente
+                </Button>
+              </div>
+            </div>
+          </>
         )}
       </div>
 
@@ -540,6 +766,7 @@ export default function EgresosPage() {
                         
                         <option value="efectivo">Efectivo</option>
                         <option value="transferencia">Transferencia</option>
+                        <option value="deposito">Depósito bancario</option>
                         <option value="tarjeta">Tarjeta</option>
                       </select>
                     </div>

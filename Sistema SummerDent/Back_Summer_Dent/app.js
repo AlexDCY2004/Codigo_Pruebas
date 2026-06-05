@@ -18,6 +18,7 @@ import tratamientoRoute from './src/routes/tratamientoRoute.js';
 import citaRoute from './src/routes/citaRoute.js';
 import movimientoFinanzasRoute from './src/routes/movimientoFinanzasRoute.js';
 import sedeRoute from './src/routes/sedeRoute.js';
+import cajaMensualRoute from './src/routes/cajaMensualRoute.js';
 
 dotenv.config();
 
@@ -35,6 +36,8 @@ const envOrigins = (process.env.FRONTEND_URL || '')
     .filter(Boolean);
 
 const isProduction = process.env.NODE_ENV === 'production';
+// Toggle to require Origin header in production. Default: false (allow health checks, load balancer pings)
+const requireOrigin = process.env.REQUIRE_ORIGIN === 'true';
 
 // In production only envOrigins are trusted. In development allow localhost convenience origins.
 const allowedOrigins = new Set([...envOrigins]);
@@ -46,9 +49,14 @@ if (!isProduction) {
 app.use(
     cors({
         origin: (origin, callback) => {
-                // In production we require an Origin header and only allow exact origins
+                // In production: if REQUIRE_ORIGIN is set, require Origin header; otherwise allow missing Origin
                 if (isProduction) {
-                    if (!origin) return callback(new Error('Origin header requerido en producción'));
+                    if (!origin) {
+                        if (requireOrigin) return callback(new Error('Origin header requerido en producción'));
+                        // allow missing Origin (common for health checks / server pings)
+                        return callback(null, true);
+                    }
+
                     if (allowedOrigins.has(origin)) return callback(null, true);
                     return callback(new Error(`Origen no permitido por CORS: ${origin}`));
                 }
@@ -126,6 +134,7 @@ app.use('/api/tratamientos', tratamientoRoute);
 app.use('/api/citas', citaRoute);
 app.use('/api/movimientos-finanzas', movimientoFinanzasRoute);
 app.use('/api/sedes', sedeRoute);
+app.use('/api/caja-mensual', cajaMensualRoute);
 
 const PORT = Number(process.env.PORT || 5000);
 
