@@ -100,6 +100,10 @@
   color: #23324a;
 }
 
+.ingresos-mobile-list {
+  display: none;
+}
+
 .ingresos-table tbody tr {
   border-bottom: 1px solid #e9ecef;
 }
@@ -216,6 +220,15 @@
   color: #23324a;
 }
 
+.finance-form-input {
+  width: 160px;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid #dce5f0;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  color: #23324a;
+}
+
 .finance-form input:focus {
   outline: none;
   border-color: #3b82f6;
@@ -242,6 +255,407 @@
 }
 
 @media (max-width: 720px) {
+  .finance-summary-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .finance-filter-card,
+  .finance-total-card {
+    padding: 1rem;
+  }
+
+  .finance-filter-card h3 {
+    margin-bottom: 0.85rem;
+  }
+
+  .finance-range-row {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: end;
+    gap: 0.5rem;
+  }
+
+  .finance-range-field {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .finance-range-field .finance-date-input,
+  .finance-history-filters .filters-row--date .search-input.finance-date-input {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .finance-range-actions,
+  .finance-history-filters .filters-row--date .ui-btn {
+    width: auto;
+    flex: 0 0 auto;
+    white-space: nowrap;
+    align-self: end;
+  }
+
+  .finance-total-card {
+    min-height: auto;
+    align-items: flex-start;
+    width: 100%;
+  }
+
+  .finance-total-card strong {
+    font-size: 1.8rem;
+  }
+
+  .finance-total-card--income,
+  .finance-total-card--expense,
+  .finance-total-card--balance {
+    width: 100%;
+  }
+
+  .ingresos-table {
+    display: none;
+  }
+
+  .egresos-table {
+    display: none;
+  }
+
+  .ingresos-mobile-list {
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .egresos-mobile-list {
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .ingresos-mobile-card {
+    background: #fff;
+    border: 1px solid #e6e0cf;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  }
+
+  .ingresos-mobile-card__summary {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.65rem;
+    border: none;
+    background: linear-gradient(180deg, #fffdf7 0%, #fff 100%);
+    padding: 0.95rem 1rem;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .ingresos-mobile-card__toggle {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 999px;
+    background: rgba(216, 163, 26, 0.12);
+    color: #b07c00;
+  }
+
+  .ingresos-mobile-card__summary-main {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  .ingresos-mobile-card__method-label {
+    color: #6b6b6b;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 700;
+  }
+
+  .ingresos-mobile-card__method-value {
+    color: #1a1a1a;
+    font-size: 0.98rem;
+    line-height: 1.25;
+  }
+
+  .ingresos-mobile-card__method-value strong {
+    display: block;
+    font-weight: 700;
+    word-break: break-word;
+  }
+
+  .ingresos-mobile-card__type-chip {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    padding: 0.22rem 0.55rem;
+    margin-top: 0.1rem;
+    border-radius: 999px;
+    background: #eef4ff;
+    color: #2f5bea;
+    font-size: 0.76rem;
+    font-weight: 700;
+  }
+
+  .ingresos-mobile-card__summary-actions {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.25rem;
+    margin-left: auto;
+  }
+
+  .ingresos-mobile-card__details {
+    border-top: 2px solid rgba(34, 51, 84, 0.22);
+    padding: 0.9rem 1rem 1rem;
+    background: #fff;
+    display: grid;
+    gap: 0.6rem;
+  }
+
+  .ingresos-mobile-card__row {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.2rem;
+    padding-bottom: 0.7rem;
+    margin-bottom: 0.15rem;
+    border-bottom: 2px solid rgba(34, 51, 84, 0.28);
+  }
+
+  .ingresos-mobile-card__row:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: 0;
+  }
+
+  .ingresos-mobile-card__label {
+    color: #6b6b6b;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 700;
+  }
+
+  .ingresos-mobile-card__value {
+    color: #232323;
+    font-size: 0.95rem;
+    word-break: break-word;
+  }
+
+  .egresos-mobile-card {
+    background: #fff;
+    border: 1px solid #e6e0cf;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  }
+
+  .egresos-mobile-card__summary {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.65rem;
+    border: none;
+    background: linear-gradient(180deg, #fffdf7 0%, #fff 100%);
+    padding: 0.95rem 1rem;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .egresos-mobile-card__toggle {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 999px;
+    background: rgba(216, 163, 26, 0.12);
+    color: #b07c00;
+  }
+
+  .egresos-mobile-card__summary-main {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  .egresos-mobile-card__method-label {
+    color: #6b6b6b;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 700;
+  }
+
+  .egresos-mobile-card__method-value {
+    color: #1a1a1a;
+    font-size: 0.98rem;
+    line-height: 1.25;
+  }
+
+  .egresos-mobile-card__method-value strong {
+    display: block;
+    font-weight: 700;
+    word-break: break-word;
+  }
+
+  .egresos-mobile-card__type-chip {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    padding: 0.22rem 0.55rem;
+    margin-top: 0.1rem;
+    border-radius: 999px;
+    background: #eef4ff;
+    color: #2f5bea;
+    font-size: 0.76rem;
+    font-weight: 700;
+  }
+
+  /* Dashboard: month selector styling for Caja Mensual stat-card */
+  .stat-card__month {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #475569;
+    font-weight: 600;
+  }
+
+  .stat-card__month-select {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    min-width: 120px;
+    font-size: 0.95rem;
+    line-height: 1;
+    /* allow ui-btn classes to define background, border and padding */
+    padding: inherit;
+    border-radius: inherit;
+    background: transparent;
+    box-shadow: none;
+    cursor: pointer;
+    transition: none;
+  }
+
+  .stat-card__month-select:hover {
+    /* hover handled by ui-btn--secondary hover rules */
+  }
+
+  .stat-card__month-select:focus {
+    outline: none;
+    box-shadow: none;
+  }
+
+  /* Ensure the small edit button sits nicely */
+  .stat-card__small-btn {
+    padding: 0.45rem 0.75rem;
+    border-radius: 10px;
+    font-size: 0.9rem;
+  }
+
+  /* Wrapped month control with calendar icon */
+  .stat-card__month-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    background: transparent;
+    border-radius: 10px;
+    padding: 0 6px;
+    border: none;
+    box-shadow: none;
+  }
+
+  .stat-card__month-icon {
+    width: 14px;
+    height: 14px;
+    margin-right: 6px;
+    color: #2357b8;
+    flex: 0 0 auto;
+  }
+
+  .stat-card__month-wrap:focus-within {
+    box-shadow: 0 8px 20px rgba(47, 109, 223, 0.12);
+    border-color: #2357b8;
+    color: #2f5bea;
+    font-size: 0.76rem;
+    font-weight: 700;
+  }
+
+  .egresos-mobile-card__summary-actions {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.25rem;
+    margin-left: auto;
+  }
+
+  .egresos-mobile-card__details {
+    border-top: 2px solid rgba(34, 51, 84, 0.22);
+    padding: 0.9rem 1rem 1rem;
+    background: #fff;
+    display: grid;
+    gap: 0.6rem;
+  }
+
+  .egresos-mobile-card__row {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.2rem;
+    padding-bottom: 0.7rem;
+    margin-bottom: 0.15rem;
+    border-bottom: 2px solid rgba(34, 51, 84, 0.28);
+  }
+
+  .egresos-mobile-card__row:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: 0;
+  }
+
+  .egresos-mobile-card__label {
+    color: #6b6b6b;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 700;
+  }
+
+  .egresos-mobile-card__value {
+    color: #232323;
+    font-size: 0.95rem;
+    word-break: break-word;
+  }
+
+  .table-actions--mobile {
+    padding: 0;
+    gap: 0.35rem;
+  }
+
+  .table-actions--mobile .action-btn {
+    width: 36px;
+    height: 36px;
+  }
+
+  .table-actions--mobile .action-btn svg {
+    width: 18px;
+    height: 18px;
+  }
+
   .finance-form .form-row {
     grid-template-columns: 1fr;
   }

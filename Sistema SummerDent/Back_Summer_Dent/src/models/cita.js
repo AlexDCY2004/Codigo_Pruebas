@@ -3,8 +3,9 @@ import { sequelize } from '../configuracionesDB/database.js';
 import Doctor from './doctor.js';
 import Paciente from './paciente.js';
 import Tratamiento from './tratamiento.js';
+import Sede from './sede.js';
 
-const ESTADOS_CITA = ['agendada', 'confirmada', 'atendida', 'cancelada'];
+const ESTADOS_CITA = ['agendada', 'confirmada', 'Atendida', 'cancelada'];
 
 export const Cita = sequelize.define(
   'Cita',
@@ -32,6 +33,15 @@ export const Cita = sequelize.define(
       allowNull: true,
       validate: { isInt: { msg: 'El id_tratamiento debe ser un entero' } }
     },
+      sede_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true
+      },
+      tratamientos: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+        defaultValue: ''
+      },
     id_perfil: {
       type: DataTypes.UUID,
       allowNull: true
@@ -89,5 +99,8 @@ Paciente.hasMany(Cita, { foreignKey: 'id_paciente', as: 'citas' });
 
 Cita.belongsTo(Tratamiento, { foreignKey: 'id_tratamiento', as: 'tratamiento' });
 Tratamiento.hasMany(Cita, { foreignKey: 'id_tratamiento', as: 'citas' });
+
+Cita.belongsTo(Sede, { foreignKey: 'sede_id', as: 'sede' });
+Sede.hasMany(Cita, { foreignKey: 'sede_id', as: 'citas_sede' });
 
 export default Cita;

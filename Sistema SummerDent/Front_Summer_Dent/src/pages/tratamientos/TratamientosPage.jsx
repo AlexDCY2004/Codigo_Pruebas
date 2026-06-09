@@ -1,5 +1,4 @@
-import { useMemo, useState, useRef } from 'react';
-import { sanitizeText } from '../../utils/sanitize';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   createTratamiento,
@@ -10,11 +9,15 @@ import {
 import TratamientosTable from '../../components/tratamientos/TratamientosTable';
 import TratamientoModal from '../../components/tratamientos/TratamientoModal';
 import ConfirmModal from '../../components/ui/ConfirmModal';
+import Button from '../../components/ui/Button';
 import ErrorState from '../../components/feedback/ErrorState';
+
+const TRATAMIENTOS_POR_PAGINA = 15;
 
 export default function TratamientosPage() {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedTratamiento, setSelectedTratamiento] = useState(null);
   const [isViewMode, setIsViewMode] = useState(false);
@@ -30,16 +33,6 @@ export default function TratamientosPage() {
     }
   };
 
-  const showError = (msg, ms = 5000) => {
-    clearErrorTimer();
-    setErrorMessage(msg);
-    if (msg) {
-      errorTimerRef.current = setTimeout(() => {
-        setErrorMessage('');
-        errorTimerRef.current = null;
-      }, ms);
-    }
-  };
   const [modalFieldErrors, setModalFieldErrors] = useState({});
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingDelete, setPendingDelete] = useState(null);
@@ -70,6 +63,21 @@ export default function TratamientosPage() {
       );
     });
   }, [searchTerm, tratamientos]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredTratamientos.length / TRATAMIENTOS_POR_PAGINA));
+
+  const paginatedTratamientos = useMemo(() => {
+    const startIndex = (currentPage - 1) * TRATAMIENTOS_POR_PAGINA;
+    return filteredTratamientos.slice(startIndex, startIndex + TRATAMIENTOS_POR_PAGINA);
+  }, [currentPage, filteredTratamientos]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    setCurrentPage((page) => Math.min(page, totalPages));
+  }, [totalPages]);
 
   const openCreateModal = () => {
     setSelectedTratamiento(null);
@@ -112,7 +120,7 @@ export default function TratamientosPage() {
       // map known DB constraint message to user-friendly
       let friendly = 'No se pudo eliminar el tratamiento.';
       if (raw.toLowerCase().includes('violates foreign key') || raw.toLowerCase().includes('foreign key constraint')) {
-        friendly = 'No se puede eliminar el tratamiento porque está en uso en otras entidades.';
+        friendly = 'No se puede eliminar el tratamiento porque se asignó en alguna cita.';
       }
       setConfirmError(friendly);
     } finally {
@@ -187,27 +195,56 @@ export default function TratamientosPage() {
         </div>
       )}
 
-      <div className="search-container">
-        <svg className="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <circle cx="11" cy="11" r="8" />
-          <path d="m21 21-4.35-4.35" />
-        </svg>
-        <input
-          type="text"
-          className="search-input"
-          placeholder="Buscar por área, nombre, precio o descripción..."
-          value={searchTerm}
-          onChange={(event) => setSearchTerm(sanitizeText(event.target.value, 100))}
-        />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+        <label style={{ fontWeight: 700, fontSize: '0.85rem' }}>Búsqueda</label>
+        <div className="search-container">
+          <svg className="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="11" cy="11" r="8" />
+            <path d="m21 21-4.35-4.35" />
+          </svg>
+          <input
+            type="text"
+            className="search-input"
+            placeholder="Buscar por área, nombre, precio o descripción..."
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+          />
+        </div>
       </div>
 
       <TratamientosTable
-        tratamientos={filteredTratamientos}
+        tratamientos={paginatedTratamientos}
         isLoading={isLoading}
         onView={handleViewTratamiento}
         onEdit={openEditModal}
         onDelete={handleDeleteTratamiento}
       />
+
+      {!isLoading && filteredTratamientos.length > 0 && (
+        <div className="finance-pagination">
+          <div className="finance-pagination__info">
+            Mostrando {Math.min(filteredTratamientos.length, (currentPage - 1) * TRATAMIENTOS_POR_PAGINA + 1)}-
+            {Math.min(filteredTratamientos.length, currentPage * TRATAMIENTOS_POR_PAGINA)} de {filteredTratamientos.length}
+          </div>
+          <div className="finance-pagination__controls">
+            <Button
+              variant="secondary"
+              onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+              disabled={currentPage <= 1}
+            >
+              Anterior
+            </Button>
+            <span className="finance-pagination__page">Página {currentPage} de {totalPages}</span>
+            <Button
+              variant="secondary"
+              onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+              disabled={currentPage >= totalPages}
+            >
+              Siguiente
+            </Button>
+          </div>
+        </div>
+      )}
 
       <TratamientoModal
         isOpen={isModalOpen}

@@ -1,26 +1,43 @@
-import { useMemo, useState } from 'react';
-import { Eye, Edit2, Trash2 } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronDown, ChevronUp, Eye, Edit2 } from 'lucide-react';
+import { useAuthStore } from '../../store/authStore';
 import ConfirmModal from '../../components/ui/ConfirmModal';
 import Button from '../../components/ui/Button';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   createMovimientoFinanzas,
-  deleteMovimientoFinanzas,
   fetchIngresos,
   updateMovimientoFinanzas
 } from '../../services/api/movimientoFinanzas';
 import { fetchDoctores } from '../../services/api/doctores';
 import { fetchCitas } from '../../services/api/citas';
 import ErrorState from '../../components/feedback/ErrorState';
-import { sanitizeText, sanitizeDecimal } from '../../utils/sanitize';
+
+const getTodayInputDate = () => {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${dd}`;
+};
 
 const initialFormState = {
   id_doctor: '',
   monto: '',
   descripcion: '',
   metodo_pago: 'efectivo',
-  fecha: ''
+  fecha: getTodayInputDate()
 };
+
+const MOVIMIENTOS_POR_PAGINA = 15;
+
+const METODO_PAGO_OPTIONS = [
+  { value: '', label: 'Todos' },
+  { value: 'efectivo', label: 'Efectivo' },
+  { value: 'transferencia', label: 'Transferencia' },
+  { value: 'deposito', label: 'Depósito' },
+  { value: 'tarjeta', label: 'Tarjeta' }
+];
 
 const formatCurrency = (value) => new Intl.NumberFormat('es-EC', {
   style: 'currency',
@@ -70,6 +87,36 @@ const toInputDate = (value) => {
   return `${y}-${m}-${d}`;
 };
 
+const sanitizeMontoInput = (raw) => {
+  const s = String(raw || '');
+  // keep only digits and dots
+  let cleaned = s.replace(/[^0-9.]/g, '');
+  if (!cleaned) return '';
+  // keep only first dot
+  const firstDot = cleaned.indexOf('.');
+  if (firstDot !== -1) {
+    cleaned = cleaned.slice(0, firstDot + 1) + cleaned.slice(firstDot + 1).replace(/\./g, '');
+  }
+
+  const parts = cleaned.split('.');
+  let intPart = parts[0] || '';
+  let decPart = parts[1] || '';
+
+  // limit integer part to 5 digits and decimals to 2
+  intPart = intPart.slice(0, 5);
+  decPart = decPart.slice(0, 2);
+
+  // if user typed a trailing dot, preserve it while typing
+  if (cleaned.endsWith('.') && decPart === '') {
+    // allow '.5' style by converting empty int to '0.'
+    if (intPart === '') return '0.';
+    return `${intPart}.`;
+  }
+
+  if (decPart) return `${intPart}.${decPart}`;
+  return intPart;
+};
+
 const ReadRow = ({ label, value }) => (
   <div className="finance-read-row">
     <div className="finance-read-label">{label}</div>
@@ -115,10 +162,12 @@ const isIngresoDesdeCitaAtendida = (ingreso, citas = []) => {
 
 export default function IngresosPage() {
   const queryClient = useQueryClient();
+  const user = useAuthStore((state) => state.user);
   const [searchTerm, setSearchTerm] = useState('');
   //const [dateFilter, setDateFilter] = useState('');
   const [desde, setDesde] = useState('');
   const [hasta, setHasta] = useState('');
+  const [dateError, setDateError] = useState('');
   const [metodoPago, setMetodoPago] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedIngreso, setSelectedIngreso] = useState(null);
@@ -127,14 +176,14 @@ export default function IngresosPage() {
   const [errorMessage, setErrorMessage] = useState('');
   const [formData, setFormData] = useState(initialFormState);
   const [formErrors, setFormErrors] = useState({});
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const [pendingDelete, setPendingDelete] = useState(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [confirmError, setConfirmError] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [isMetodoMenuOpen, setIsMetodoMenuOpen] = useState(false);
+  const metodoSelectorRef = useRef(null);
+  const sedeActiva = useAuthStore((s) => s.sedeActiva);
 
   const { data: ingresos = [], isLoading, isError, refetch } = useQuery({
-    queryKey: ['ingresos', desde, hasta, metodoPago],
-    queryFn: () => fetchIngresos({ desde: desde || undefined, hasta: hasta || undefined, metodo_pago: metodoPago || undefined })
+    queryKey: ['ingresos', sedeActiva, desde, hasta, metodoPago],
+    queryFn: () => fetchIngresos({ desde: desde || undefined, hasta: hasta || undefined, metodo_pago: metodoPago || undefined, sede_id: sedeActiva || undefined })
   });
 
   const { data: doctores = [], isLoading: isDoctoresLoading } = useQuery({
@@ -152,6 +201,43 @@ export default function IngresosPage() {
     && selectedIngreso?.id
     && isIngresoDesdeCitaAtendida(selectedIngreso, citas)
   );
+
+  const isSuperadmin = user && user.rol === 'superadmin';
+  const [expandedIngresoId, setExpandedIngresoId] = useState(null);
+
+  const toggleIngresoDetails = (ingresoId) => {
+    setExpandedIngresoId((currentId) => (currentId === ingresoId ? null : ingresoId));
+  };
+
+  const renderIngresoActions = (ingreso) => (
+    <div className="table-actions table-actions--mobile">
+      <button
+        type="button"
+        onClick={() => handleViewIngreso(ingreso)}
+        className="action-btn action-btn--view"
+        title="Ver detalles"
+      >
+        <Eye size={16} />
+      </button>
+      {!isSuperadmin && (
+        <button
+          type="button"
+          onClick={() => openEditModal(ingreso)}
+          className="action-btn action-btn--edit"
+          title="Editar"
+        >
+          <Edit2 size={16} />
+        </button>
+      )}
+    </div>
+  );
+
+  const renderIngresoDetails = (ingreso) => [
+    { label: 'Doctor', value: getDoctorLabel(ingreso) },
+    { label: 'Monto', value: formatCurrency(ingreso.monto) },
+    { label: 'Descripción', value: ingreso.descripcion || '-' },
+    { label: 'Fecha Registro', value: formatDate(ingreso.fecha) }
+  ];
 
   const totalIngresos = useMemo(
     () => ingresos.reduce((acc, ingreso) => acc + Number(ingreso.monto || 0), 0),
@@ -186,6 +272,54 @@ export default function IngresosPage() {
     });
   }, [desde, hasta, ingresos, searchTerm, metodoPago]);
 
+  const totalPages = Math.max(1, Math.ceil(filteredIngresos.length / MOVIMIENTOS_POR_PAGINA));
+
+  const paginatedIngresos = useMemo(() => {
+    const startIndex = (currentPage - 1) * MOVIMIENTOS_POR_PAGINA;
+    return filteredIngresos.slice(startIndex, startIndex + MOVIMIENTOS_POR_PAGINA);
+  }, [currentPage, filteredIngresos]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [desde, hasta, searchTerm, metodoPago]);
+
+  useEffect(() => {
+    setCurrentPage((page) => Math.min(page, totalPages));
+  }, [totalPages]);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return undefined;
+
+    const handlePointerDown = (event) => {
+      if (!metodoSelectorRef.current?.contains(event.target)) {
+        setIsMetodoMenuOpen(false);
+      }
+    };
+
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') {
+        setIsMetodoMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('touchstart', handlePointerDown);
+    document.addEventListener('keydown', handleEscape);
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('touchstart', handlePointerDown);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, []);
+
+  const activeMetodoLabel = METODO_PAGO_OPTIONS.find((option) => option.value === metodoPago)?.label || 'Todos';
+
+  const handleMetodoChange = (value) => {
+    setMetodoPago(value);
+    setIsMetodoMenuOpen(false);
+  };
+
   const openCreateModal = () => {
     setSelectedIngreso(null);
     setIsViewMode(false);
@@ -210,33 +344,6 @@ export default function IngresosPage() {
     setIsModalOpen(true);
   };
 
-  const handleDeleteIngreso = (ingreso) => {
-    setPendingDelete(ingreso);
-    setConfirmError('');
-    setConfirmOpen(true);
-  };
-
-  const confirmDeleteIngreso = async () => {
-    if (!pendingDelete) return;
-    setIsDeleting(true);
-    try {
-      await deleteMovimientoFinanzas(pendingDelete.id);
-      queryClient.invalidateQueries({ queryKey: ['ingresos'] });
-      setConfirmOpen(false);
-      setPendingDelete(null);
-    } catch (error) {
-      const raw = error.response?.data?.error || error.message || '';
-      let friendly = 'No se pudo eliminar el ingreso.';
-      if (String(raw).toLowerCase().includes('foreign key') || String(raw).toLowerCase().includes('violates')) {
-        friendly = 'No se puede eliminar el ingreso porque está en uso.';
-      }
-      setConfirmError(friendly);
-      setErrorMessage(friendly);
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
   const handleViewIngreso = (ingreso) => {
     setSelectedIngreso(ingreso);
     setIsViewMode(true);
@@ -257,10 +364,12 @@ export default function IngresosPage() {
 
     if (!formData.monto.trim()) {
       nextErrors.monto = 'El monto es obligatorio';
-    } else if (!/^\d+(\.\d{1,2})?$/.test(formData.monto.trim())) {
-      nextErrors.monto = 'El monto debe ser un número válido';
+    } else if (!/^\d{1,5}(\.\d{1,2})?$/.test(formData.monto.trim())) {
+      nextErrors.monto = 'El monto debe tener hasta 5 dígitos enteros y hasta 2 decimales';
     } else if (Number(formData.monto) <= 0) {
       nextErrors.monto = 'El monto debe ser mayor a 0';
+    } else if (Number(formData.monto) > 99999.99) {
+      nextErrors.monto = 'El monto no puede ser mayor a 99999.99';
     }
 
     if (formData.descripcion && formData.descripcion.length > 300) {
@@ -271,6 +380,14 @@ export default function IngresosPage() {
       nextErrors.fecha = 'La fecha debe tener formato YYYY-MM-DD';
     }
 
+    // For new ingresos (not editing an existing one), require the date to be today's date
+    if (!selectedIngreso) {
+      const today = getTodayInputDate();
+      if (!formData.fecha || formData.fecha !== today) {
+        nextErrors.fecha = 'La fecha debe ser la fecha actual';
+      }
+    }
+
     setFormErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   };
@@ -278,21 +395,12 @@ export default function IngresosPage() {
   const handleFormChange = (event) => {
     const { name, value } = event.target;
 
-    let sanitized = value;
-    switch (name) {
-      case 'monto':
-        sanitized = sanitizeDecimal(value);
-        break;
-      case 'descripcion':
-        sanitized = sanitizeText(value, 300);
-        break;
-      default:
-        break;
-    }
+    let nextValue = value;
+    if (name === 'monto') nextValue = sanitizeMontoInput(value);
 
     setFormData((prev) => ({
       ...prev,
-      [name]: sanitized
+      [name]: nextValue
     }));
 
     if (formErrors[name]) {
@@ -300,6 +408,17 @@ export default function IngresosPage() {
         ...prev,
         [name]: ''
       }));
+    }
+  };
+
+  const handlePaste = (event) => {
+    const { name } = event.target;
+    if (name === 'monto') {
+      event.preventDefault();
+      const paste = (event.clipboardData || window.clipboardData).getData('text') || '';
+      const sanitized = sanitizeMontoInput(paste);
+      setFormData((prev) => ({ ...prev, monto: sanitized }));
+      if (formErrors.monto) setFormErrors((prev) => ({ ...prev, monto: '' }));
     }
   };
 
@@ -320,6 +439,8 @@ export default function IngresosPage() {
       fecha: formData.fecha || undefined
     };
 
+    if (sedeActiva) payload.sede_id = sedeActiva;
+
     try {
       if (selectedIngreso?.id) {
         await updateMovimientoFinanzas(selectedIngreso.id, payload);
@@ -330,7 +451,11 @@ export default function IngresosPage() {
       setIsModalOpen(false);
       setSelectedIngreso(null);
       setFormData(initialFormState);
-      queryClient.invalidateQueries({ queryKey: ['ingresos'] });
+      queryClient.invalidateQueries({ queryKey: ['ingresos', sedeActiva] });
+      // actualizar cache de caja mensual para que refleje los movimientos recientes
+      queryClient.invalidateQueries({ queryKey: ['caja-mensual', sedeActiva] });
+      queryClient.invalidateQueries({ queryKey: ['caja-mensual-history', sedeActiva] });
+      queryClient.invalidateQueries({ queryKey: ['caja-mensual-dashboard', sedeActiva] });
     } catch (error) {
       setErrorMessage(error.response?.data?.error || 'No se pudo guardar el ingreso.');
     } finally {
@@ -357,34 +482,84 @@ export default function IngresosPage() {
       <div className="finance-summary-grid">
         <section className="finance-filter-card">
           <h3>Filtrar por rango</h3>
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-            <input
-              type="date"
-              className="search-input finance-date-input"
-              value={desde}
-              onChange={(event) => setDesde(event.target.value)}
-              placeholder="Desde"
-            />
-            <span style={{ fontSize: '0.9rem' }}>—</span>
-            <input
-              type="date"
-              className="search-input finance-date-input"
-              value={hasta}
-              onChange={(event) => setHasta(event.target.value)}
-              placeholder="Hasta"
-            />
-            <Button variant="secondary" onClick={() => { setDesde(''); setHasta(''); }} style={{ marginLeft: '0.5rem' }}>Limpiar</Button>
+          <div className="finance-range-row">
+            <div className="finance-range-field">
+              <label style={{ fontSize: '0.85rem', marginBottom: '0.25rem', fontWeight: 700 }}>Desde</label>
+              <input
+                type="date"
+                className="search-input finance-date-input"
+                value={desde}
+                onChange={(event) => {
+                  const v = event.target.value;
+                  setDesde(v);
+                  // if invalid range, show error
+                  if (v && hasta && v > hasta) setDateError('La fecha desde cuando se quiere filtrar debe ser menor o igual que hasta cuando se quiere filtrar');
+                  else setDateError('');
+                }}
+                placeholder="Desde"
+              />
+            </div>
+
+            <div className="finance-range-field">
+              <label style={{ fontSize: '0.85rem', marginBottom: '0.25rem', fontWeight: 700 }}>Hasta</label>
+              <input
+                type="date"
+                className="search-input finance-date-input"
+                value={hasta}
+                onChange={(event) => {
+                  const v = event.target.value;
+                  setHasta(v);
+                  // if invalid range, show error
+                  if (v && desde && v < desde) setDateError('La fecha "Hasta" debe ser mayor o igual que "Desde"');
+                  else setDateError('');
+                }}
+                placeholder="Hasta"
+              />
+            </div>
+
+            <Button variant="secondary" onClick={() => { setDesde(''); setHasta(''); }} className="finance-range-actions">Limpiar</Button>
           </div>
+          {dateError && (
+            <div className="alert alert-error" style={{ marginTop: '0.5rem' }}>{dateError}</div>
+          )}
 
           <div style={{ marginTop: '0.75rem' }}>
-            <h3 style={{ margin: 0, fontSize: '1rem' }}>Método de pago</h3>
+            <h3 style={{ margin: 0, fontSize: '0.85rem' }}>Método de pago</h3>
             <div style={{ marginTop: '0.5rem' }}>
-              <select value={metodoPago} onChange={(e) => setMetodoPago(e.target.value)}>
-                <option value="">Todos</option>
-                <option value="efectivo">Efectivo</option>
-                <option value="transferencia">Transferencia</option>
-                <option value="tarjeta">Tarjeta</option>
-              </select>
+              <div className="finance-method-selector sede-selector" ref={metodoSelectorRef} style={{ width: '100%', flex: '1 1 auto' }}>
+                <div className="finance-method-selector__control" style={{ width: '100%' }}>
+                  <button
+                    type="button"
+                    className="finance-method-selector__trigger"
+                    aria-haspopup="listbox"
+                    aria-expanded={isMetodoMenuOpen}
+                    onClick={() => setIsMetodoMenuOpen((open) => !open)}
+                  >
+                    <span className="finance-method-selector__trigger-text">{activeMetodoLabel}</span>
+                  </button>
+                  <ChevronDown className="finance-method-selector__chevron" size={18} aria-hidden="true" />
+                  {isMetodoMenuOpen ? (
+                    <div className="finance-method-selector__menu" role="listbox" aria-label="Selector de método de pago">
+                      {METODO_PAGO_OPTIONS.map((option) => {
+                        const isSelected = option.value === metodoPago;
+
+                        return (
+                          <button
+                            key={option.value || 'todos'}
+                            type="button"
+                            role="option"
+                            aria-selected={isSelected}
+                            className={isSelected ? 'sede-selector__item sede-selector__item--active' : 'sede-selector__item'}
+                            onClick={() => handleMetodoChange(option.value)}
+                          >
+                            {option.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
             </div>
           </div>
         </section>
@@ -405,7 +580,7 @@ export default function IngresosPage() {
           className="search-input"
           placeholder="Buscar por fecha, doctor, monto o descripción..."
           value={searchTerm}
-          onChange={(event) => setSearchTerm(sanitizeText(event.target.value, 100))}
+          onChange={(event) => setSearchTerm(event.target.value)}
         />
       </div>
 
@@ -437,34 +612,113 @@ export default function IngresosPage() {
             <p>Prueba ajustando el filtro de fecha o agrega un nuevo ingreso.</p>
           </div>
         ) : (
-          <table className="ingresos-table">
-            <thead>
-              <tr>
-                <th>Doctor</th>
-                <th>Método de pago</th>
-                <th>Monto</th>
-                <th>Descripción</th>
-                <th>Fecha Registro</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredIngresos.map((ingreso) => (
-                <tr key={ingreso.id}>
-                  <td>{getDoctorLabel(ingreso)}</td>
-                  <td>{ingreso.metodo_pago || '-'}</td>
-                  <td className="finance-amount">{formatCurrency(ingreso.monto)}</td>
-                  <td className="finance-description">{ingreso.descripcion || '-'}</td>
-                  <td>{formatDate(ingreso.fecha)}</td>
-                  <td className="table-actions">
-                    <button type="button" onClick={() => handleViewIngreso(ingreso)} className="action-btn action-btn--view" title="Ver detalles"><Eye size={16} /></button>
-                    <button type="button" onClick={() => openEditModal(ingreso)} className="action-btn action-btn--edit" title="Editar"><Edit2 size={16} /></button>
-                    <button type="button" onClick={() => handleDeleteIngreso(ingreso)} className="action-btn action-btn--delete" title="Eliminar"><Trash2 size={16} /></button>
-                  </td>
+          <>
+            <table className="ingresos-table">
+              <thead>
+                <tr>
+                  <th>Doctor</th>
+                  <th>Método de pago</th>
+                  <th>Monto</th>
+                  <th>Descripción</th>
+                  <th>Fecha Registro</th>
+                  <th>Acciones</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {paginatedIngresos.map((ingreso) => (
+                  <tr key={ingreso.id}>
+                    <td>{getDoctorLabel(ingreso)}</td>
+                    <td>{ingreso.metodo_pago || '-'}</td>
+                    <td className="finance-amount">{formatCurrency(ingreso.monto)}</td>
+                    <td className="finance-description">{ingreso.descripcion || '-'}</td>
+                    <td>{formatDate(ingreso.fecha)}</td>
+                    <td className="table-actions">
+                      {(() => {
+                        const user = useAuthStore.getState().user;
+                        const isSuperadmin = user && user.rol === 'superadmin';
+                        return (
+                          <>
+                            <button type="button" onClick={() => handleViewIngreso(ingreso)} className="action-btn action-btn--view" title="Ver detalles"><Eye size={16} /></button>
+                            {!isSuperadmin && (
+                              <button type="button" onClick={() => openEditModal(ingreso)} className="action-btn action-btn--edit" title="Editar"><Edit2 size={16} /></button>
+                            )}
+                          </>
+                        );
+                      })()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            <div className="ingresos-mobile-list" aria-label="Tabla de ingresos en móvil">
+              {paginatedIngresos.map((ingreso) => {
+                const isExpanded = expandedIngresoId === ingreso.id;
+
+                return (
+                  <article key={ingreso.id} className="ingresos-mobile-card">
+                    <button
+                      type="button"
+                      className="ingresos-mobile-card__summary"
+                      onClick={() => toggleIngresoDetails(ingreso.id)}
+                      aria-expanded={isExpanded}
+                      aria-controls={`ingreso-mobile-details-${ingreso.id}`}
+                    >
+                      <span className="ingresos-mobile-card__toggle" aria-hidden="true">
+                        {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                      </span>
+
+                      <span className="ingresos-mobile-card__summary-main">
+                        <span className="ingresos-mobile-card__method-label">Monto</span>
+                        <span className="ingresos-mobile-card__method-value">
+                          <strong>{formatCurrency(ingreso.monto)}</strong>
+                        </span>
+                      </span>
+
+                      <span className="ingresos-mobile-card__summary-actions" onClick={(event) => event.stopPropagation()}>
+                        {renderIngresoActions(ingreso)}
+                      </span>
+                    </button>
+
+                    {isExpanded ? (
+                      <div className="ingresos-mobile-card__details" id={`ingreso-mobile-details-${ingreso.id}`}>
+                        {renderIngresoDetails(ingreso).map((item) => (
+                          <div key={item.label} className="ingresos-mobile-card__row">
+                            <span className="ingresos-mobile-card__label">{item.label}</span>
+                            <span className="ingresos-mobile-card__value">{item.value}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+                  </article>
+                );
+              })}
+            </div>
+
+            <div className="finance-pagination">
+              <div className="finance-pagination__info">
+                Mostrando {Math.min(filteredIngresos.length, (currentPage - 1) * MOVIMIENTOS_POR_PAGINA + 1)}-
+                {Math.min(filteredIngresos.length, currentPage * MOVIMIENTOS_POR_PAGINA)} de {filteredIngresos.length}
+              </div>
+              <div className="finance-pagination__controls">
+                <Button
+                  variant="secondary"
+                  onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                  disabled={currentPage <= 1}
+                >
+                  Anterior
+                </Button>
+                <span className="finance-pagination__page">Página {currentPage} de {totalPages}</span>
+                <Button
+                  variant="secondary"
+                  onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                  disabled={currentPage >= totalPages}
+                >
+                  Siguiente
+                </Button>
+              </div>
+            </div>
+          </>
         )}
       </div>
 
@@ -488,7 +742,7 @@ export default function IngresosPage() {
                   <ReadRow label="Fecha:" value={formatDate(selectedIngreso?.fecha)} />
                   <ReadRow label="Doctor:" value={getDoctorLabel(selectedIngreso || {})} />
                   <ReadRow label="Tipo:" value={selectedIngreso?.tipo || 'ingreso'} />
-                  <ReadRow label="Método:" value={selectedIngreso?.metodo_pago || '-'} />
+                      <ReadRow label="Método:" value={selectedIngreso?.metodo_pago || '-'} />
                   <ReadRow label="Monto:" value={formatCurrency(selectedIngreso?.monto)} />
                   <ReadRow label="Descripción:" value={selectedIngreso?.descripcion || '-'} />
                   <ReadRow label="Fecha Registro:" value={formatDate(selectedIngreso?.created_at)} />
@@ -520,6 +774,7 @@ export default function IngresosPage() {
                         disabled={isDoctoresLoading || isIngresoBloqueado}
                       >
                         <option value="">No especificado</option>
+
                         {doctores.map((doc) => (
                           <option key={doc.id} value={String(doc.id)}>{doc.nombre}</option>
                         ))}
@@ -547,11 +802,11 @@ export default function IngresosPage() {
                       <input
                         id="monto"
                         name="monto"
-                        type="number"
-                        step="0.01"
-                        min="0"
+                        type="text"
+                        inputMode="decimal"
                         value={formData.monto}
                         onChange={handleFormChange}
+                        onPaste={handlePaste}
                         disabled={isIngresoBloqueado}
                         className={formErrors.monto ? 'input-error' : ''}
                         placeholder="0.00"
@@ -583,7 +838,9 @@ export default function IngresosPage() {
                         value={formData.metodo_pago}
                         onChange={handleFormChange}
                         disabled={isIngresoBloqueado}
+                        className={formErrors.metodo_pago ? 'input-error' : ''}
                       >
+                        
                         <option value="efectivo">Efectivo</option>
                         <option value="transferencia">Transferencia</option>
                         <option value="tarjeta">Tarjeta</option>
@@ -605,15 +862,6 @@ export default function IngresosPage() {
           </div>
         </div>
       )}
-
-      <ConfirmModal
-        isOpen={confirmOpen}
-        title="Eliminar Ingreso"
-        message={confirmError || `¿Eliminar el ingreso de ${formatCurrency(pendingDelete?.monto || 0)}?`}
-        onConfirm={confirmDeleteIngreso}
-        onCancel={() => { setConfirmOpen(false); setPendingDelete(null); setConfirmError(''); }}
-        isLoading={isDeleting}
-      />
     </div>
   );
 }

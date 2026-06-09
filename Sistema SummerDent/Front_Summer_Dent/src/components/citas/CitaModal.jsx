@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-import { sanitizeText, sanitizeDecimal } from '../../utils/sanitize';
 
 const normalizeText = (value) => String(value || '').trim().toLowerCase();
 
@@ -72,6 +71,36 @@ const getInitialFormData = (initialData, tratamientos) => {
   };
 };
 
+// Allowed schedule window for appointments
+const OPEN_TIME = '08:00';
+const CLOSE_TIME = '20:00';
+
+const getLocalDateYYYYMMDD = (date = new Date()) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const getDateOffsetMonths = (months) => {
+  const date = new Date();
+  date.setHours(0, 0, 0, 0);
+  date.setMonth(date.getMonth() + months);
+  return getLocalDateYYYYMMDD(date);
+};
+
+const getCitaDateWindow = () => ({
+  minDate: getDateOffsetMonths(-2),
+  maxDate: getDateOffsetMonths(3)
+});
+
+const isFechaCitaWithinWindow = (fecha) => {
+  if (!fecha) return false;
+  const value = String(fecha).split('T')[0];
+  const { minDate, maxDate } = getCitaDateWindow();
+  return value >= minDate && value <= maxDate;
+};
+
 const getInitialPacienteQuery = (initialData, pacientes) => {
   if (!initialData?.id_paciente) return '';
   const found = (pacientes || []).find((item) => String(item.id_cedula) === String(initialData.id_paciente));
@@ -94,6 +123,7 @@ function ReadRow({ label, value }) {
 }
 
 export default function CitaModal({ isOpen, onClose, onSubmit, initialData, isLoading, pacientes = [], doctores = [], tratamientos = [], readOnly = false, externalErrors = {} }) {
+  const isReadOnly = readOnly || String(initialData?.estado || '').toLowerCase() === 'atendida';
   const [formData, setFormData] = useState(() => getInitialFormData(initialData, tratamientos));
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isPrecioEdited, setIsPrecioEdited] = useState(() => {
@@ -190,9 +220,15 @@ export default function CitaModal({ isOpen, onClose, onSubmit, initialData, isLo
     return names.length ? names.join(', ') : '-';
   };
 
+  const getTratamientoPrecio = (tratamientoId) => {
+    const found = tratamientos.find((item) => String(item.id) === String(tratamientoId));
+    const precio = Number(found?.precio || 0);
+    return Number.isFinite(precio) ? precio : 0;
+  };
+
   const validateForm = () => {
     const newErrors = {};
-    
+
     if (!formData.id_paciente) newErrors.id_paciente = 'Paciente requerido';
     if (!formData.id_doctor) newErrors.id_doctor = 'Odontólogo requerido';
     if (!Array.isArray(formData.tratamientos) || formData.tratamientos.length === 0) {
@@ -200,48 +236,117 @@ export default function CitaModal({ isOpen, onClose, onSubmit, initialData, isLo
     }
     if (!formData.fecha) newErrors.fecha = 'Fecha requerida';
     else {
-      // bloquear fechas anteriores a hoy (usar fecha local para evitar desfases por zona horaria)
+      // bloquear fechas fuera de la ventana permitida: 2 meses antes y 3 meses después de hoy
       try {
-        const d = new Date();
-        const y = d.getFullYear();
-        const m = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        const today = `${y}-${m}-${day}`;
-        if (String(formData.fecha) < today) {
-          newErrors.fecha = 'La fecha no puede ser anterior a hoy';
+        const { minDate, maxDate } = getCitaDateWindow();
+        const fechaValue = String(formData.fecha).split('T')[0];
+
+        if (fechaValue < minDate || fechaValue > maxDate) {
+          newErrors.fecha = `La fecha debe estar entre ${minDate} y ${maxDate}`;
         }
       } catch {
         // ignore parsing errors, other validations will catch invalid formats
       }
     }
     if (!formData.hora_inicio) newErrors.hora_inicio = 'Hora inicio requerida';
-    else if (formData.hora_inicio < '08:00') newErrors.hora_inicio = 'El horario de atención inicia a las 08:00';
-    else if (formData.hora_inicio >= '20:00') newErrors.hora_inicio = 'El horario de atención finaliza a las 20:00';
-
     if (!formData.hora_fin) newErrors.hora_fin = 'Hora fin requerida';
-    else if (formData.hora_fin > '20:00') newErrors.hora_fin = 'El horario de atención finaliza a las 20:00';
-    else if (formData.hora_fin <= '08:00') newErrors.hora_fin = 'El horario de atención inicia a las 08:00';
-    
+
+    // validate within allowed schedule window
+    if (formData.hora_inicio) {
+      if (String(formData.hora_inicio) < OPEN_TIME || String(formData.hora_inicio) > CLOSE_TIME) {
+        newErrors.hora_inicio = `La hora de inicio debe estar entre ${OPEN_TIME} y ${CLOSE_TIME}`;
+      }
+    }
+    if (formData.hora_fin) {
+      if (String(formData.hora_fin) < OPEN_TIME || String(formData.hora_fin) > CLOSE_TIME) {
+        newErrors.hora_fin = `La hora de fin debe estar entre ${OPEN_TIME} y ${CLOSE_TIME}`;
+      }
+    }
+
     if (formData.hora_inicio && formData.hora_fin && formData.hora_inicio >= formData.hora_fin) {
       newErrors.hora_fin = 'Hora fin debe ser posterior a hora inicio';
     }
 
-    // Validar duración máxima de 2 horas
-    if (formData.hora_inicio && formData.hora_fin && formData.hora_inicio < formData.hora_fin && !newErrors.hora_inicio && !newErrors.hora_fin) {
-      const [hi, mi] = formData.hora_inicio.split(':').map(Number);
-      const [hf, mf] = formData.hora_fin.split(':').map(Number);
-      const duracionMinutos = (hf * 60 + mf) - (hi * 60 + mi);
-      if (duracionMinutos > 120) {
-        newErrors.hora_fin = 'La duración máxima de una cita es de 2 horas';
+    // precio editable: validar hasta 4 dígitos y 2 decimales
+    if (isPrecioEdited) {
+      const precioVal = String(formData.precio ?? '').trim();
+      if (!/^[0-9]{1,4}(\.[0-9]{1,2})?$/.test(precioVal)) {
+        newErrors.precio = 'El precio debe tener hasta 4 dígitos y hasta 2 decimales';
+      } else if (Number(precioVal) < 0) {
+        newErrors.precio = 'El precio debe ser mayor o igual a 0';
+      } else if (Number(precioVal) > 9999.99) {
+        newErrors.precio = 'El precio no puede ser mayor a 9999.99';
       }
     }
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
+  const validateField = (fieldName) => {
+    const newErrors = { ...(errors || {}) };
+
+    if (fieldName === 'fecha') {
+      if (!formData.fecha) newErrors.fecha = 'Fecha requerida';
+      else {
+        try {
+          const { minDate, maxDate } = getCitaDateWindow();
+          const fechaValue = String(formData.fecha).split('T')[0];
+
+          if (fechaValue < minDate || fechaValue > maxDate) {
+            newErrors.fecha = `La fecha debe estar entre ${minDate} y ${maxDate}`;
+          } else {
+            delete newErrors.fecha;
+          }
+        } catch {
+          newErrors.fecha = 'Fecha inválida';
+        }
+      }
+    }
+
+    if (fieldName === 'hora_inicio' || fieldName === 'hora_fin') {
+      const start = formData.hora_inicio;
+      const end = formData.hora_fin;
+
+      if (fieldName === 'hora_inicio') {
+        if (!start) newErrors.hora_inicio = 'Hora inicio requerida';
+        else if (String(start) < OPEN_TIME || String(start) > CLOSE_TIME) newErrors.hora_inicio = `La hora de inicio debe estar entre ${OPEN_TIME} y ${CLOSE_TIME}`;
+        else delete newErrors.hora_inicio;
+      }
+
+      if (fieldName === 'hora_fin') {
+        if (!end) newErrors.hora_fin = 'Hora fin requerida';
+        else if (String(end) < OPEN_TIME || String(end) > CLOSE_TIME) newErrors.hora_fin = `La hora de fin debe estar entre ${OPEN_TIME} y ${CLOSE_TIME}`;
+        else delete newErrors.hora_fin;
+      }
+
+      if (start && end && start >= end) {
+        newErrors.hora_fin = 'Hora fin debe ser posterior a hora inicio';
+      }
+    }
+
+    if (fieldName === 'precio') {
+      if (isPrecioEdited) {
+        const precioVal = String(formData.precio ?? '').trim();
+        if (!/^[0-9]{1,4}(\.[0-9]{1,2})?$/.test(precioVal)) {
+          newErrors.precio = 'El precio puede tener hasta 4 dígitos y hasta 2 decimales';
+        } else if (Number(precioVal) < 0) {
+          newErrors.precio = 'El precio debe ser mayor o igual a 0';
+        } else if (Number(precioVal) > 9999.99) {
+          newErrors.precio = 'El precio no puede ser mayor a 9999.99';
+        } else {
+          delete newErrors.precio;
+        }
+      } else {
+        delete newErrors.precio;
+      }
+    }
+
+    setErrors(newErrors);
+  };
+
   const handleChange = (e) => {
-    if (readOnly) return;
+    if (isReadOnly) return;
     const { name, value } = e.target;
     // Si el usuario cambia el estado a 'Atendida' y la cita no estaba ya atendida,
     // abrimos inmediatamente el modal de pago antes de guardar.
@@ -272,7 +377,7 @@ export default function CitaModal({ isOpen, onClose, onSubmit, initialData, isLo
   };
 
   const handleSelectPaciente = (paciente) => {
-    if (readOnly) return;
+    if (isReadOnly) return;
     setFormData((prev) => ({ ...prev, id_paciente: String(paciente.id_cedula) }));
     setPacienteQuery(formatPersonName(paciente));
     setIsPacienteOpen(false);
@@ -282,7 +387,7 @@ export default function CitaModal({ isOpen, onClose, onSubmit, initialData, isLo
   };
 
   const handleSelectDoctor = (doctor) => {
-    if (readOnly) return;
+    if (isReadOnly) return;
     setFormData((prev) => ({ ...prev, id_doctor: String(doctor.id) }));
     setDoctorQuery(formatPersonName(doctor));
     setIsDoctorOpen(false);
@@ -292,7 +397,7 @@ export default function CitaModal({ isOpen, onClose, onSubmit, initialData, isLo
   };
 
   const toggleTratamiento = (tratamientoId) => {
-    if (readOnly) return;
+    if (isReadOnly) return;
 
     const currentTratamientos = formData.tratamientos || [];
     const exists = currentTratamientos.some((id) => String(id) === String(tratamientoId));
@@ -300,7 +405,22 @@ export default function CitaModal({ isOpen, onClose, onSubmit, initialData, isLo
       ? currentTratamientos.filter((id) => String(id) !== String(tratamientoId))
       : [...currentTratamientos, String(tratamientoId)];
 
-    setFormData((prev) => ({ ...prev, tratamientos: nextTratamientos }));
+    const currentMonto = formData.precio !== undefined && formData.precio !== ''
+      ? Number(formData.precio)
+      : (currentTratamientos || []).reduce((acc, id) => acc + getTratamientoPrecio(id), 0);
+
+    const deltaMonto = exists
+      ? -getTratamientoPrecio(tratamientoId)
+      : getTratamientoPrecio(tratamientoId);
+
+    const nextMonto = Math.max(0, Number((currentMonto + deltaMonto).toFixed(2)));
+
+    setFormData((prev) => ({
+      ...prev,
+      tratamientos: nextTratamientos,
+      precio: String(nextMonto)
+    }));
+    setIsPrecioEdited(true);
 
     if (displayErrors.tratamientos) {
       setErrors((prev) => ({ ...prev, tratamientos: '' }));
@@ -309,7 +429,7 @@ export default function CitaModal({ isOpen, onClose, onSubmit, initialData, isLo
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (readOnly) return;
+    if (isReadOnly) return;
     if (validateForm()) {
       // Si cambia a Atendida desde otro estado y aún no tenemos metodo_pago, abrir modal
       const willAttend = String(formData.estado) === 'Atendida';
@@ -347,14 +467,14 @@ export default function CitaModal({ isOpen, onClose, onSubmit, initialData, isLo
           </div>
         )}
         <div className="modal-header">
-          <h2>{readOnly ? 'Ver Cita' : (initialData?.id ? 'Editar Cita' : 'Nueva Cita')}</h2>
+          <h2>{isReadOnly ? 'Ver Cita' : (initialData?.id ? 'Editar Cita' : 'Nueva Cita')}</h2>
           <button type="button" className="modal-close" onClick={onClose}>✕</button>
         </div>
 
-        <form onSubmit={handleSubmit} className="cita-form">
+        <form onSubmit={handleSubmit} className="cita-form" noValidate onInvalid={(e) => e.preventDefault()}>
           <div className="form-row" style={{display: 'flex', flexDirection: 'column', gap: '0.75rem'}}>
             <div className="form-group">
-              {readOnly ? (
+              {isReadOnly ? (
                 <>
                   <ReadRow label="Nombre:" value={findAndFormat(pacientes, formData.id_paciente)} />
                   <ReadRow label="Odontólogo:" value={findAndFormat(doctores, formData.id_doctor)} />
@@ -371,7 +491,7 @@ export default function CitaModal({ isOpen, onClose, onSubmit, initialData, isLo
                       onFocus={() => setIsPacienteOpen(true)}
                       onBlur={() => setTimeout(() => setIsPacienteOpen(false), 120)}
                       onChange={(event) => {
-                        setPacienteQuery(sanitizeText(event.target.value, 100));
+                        setPacienteQuery(event.target.value);
                         setIsPacienteOpen(true);
                       }}
                       onKeyDown={(event) => {
@@ -414,7 +534,7 @@ export default function CitaModal({ isOpen, onClose, onSubmit, initialData, isLo
                       onFocus={() => setIsDoctorOpen(true)}
                       onBlur={() => setTimeout(() => setIsDoctorOpen(false), 120)}
                       onChange={(event) => {
-                        setDoctorQuery(sanitizeText(event.target.value, 100));
+                        setDoctorQuery(event.target.value);
                         setIsDoctorOpen(true);
                       }}
                       onKeyDown={(event) => {
@@ -453,7 +573,7 @@ export default function CitaModal({ isOpen, onClose, onSubmit, initialData, isLo
 
           <div className="form-row" style={{display: 'flex', flexDirection: 'column', gap: '0.75rem'}}>
             <div className="form-group">
-              {readOnly ? (
+              {isReadOnly ? (
                 <>
                   <ReadRow label="Fecha:" value={formData.fecha || '-'} />
                   <ReadRow label="Hora Inicio:" value={formData.hora_inicio || '-'} />
@@ -468,7 +588,10 @@ export default function CitaModal({ isOpen, onClose, onSubmit, initialData, isLo
                     name="fecha"
                     value={formData.fecha}
                     onChange={handleChange}
+                    onBlur={() => validateField('fecha')}
                     className={errors.fecha ? 'input-error' : ''}
+                    min={getCitaDateWindow().minDate}
+                    max={getCitaDateWindow().maxDate}
                   />
                   {errors.fecha && <span className="error-text">{errors.fecha}</span>}
 
@@ -479,7 +602,10 @@ export default function CitaModal({ isOpen, onClose, onSubmit, initialData, isLo
                     name="hora_inicio"
                     value={formData.hora_inicio}
                     onChange={handleChange}
+                    onBlur={() => validateField('hora_inicio')}
                     className={errors.hora_inicio ? 'input-error' : ''}
+                    min={OPEN_TIME}
+                    max={CLOSE_TIME}
                   />
                   {errors.hora_inicio && <span className="error-text">{errors.hora_inicio}</span>}
 
@@ -490,7 +616,10 @@ export default function CitaModal({ isOpen, onClose, onSubmit, initialData, isLo
                     name="hora_fin"
                     value={formData.hora_fin}
                     onChange={handleChange}
+                    onBlur={() => validateField('hora_fin')}
                     className={errors.hora_fin ? 'input-error' : ''}
+                    min={OPEN_TIME}
+                    max={CLOSE_TIME}
                   />
                   {errors.hora_fin && <span className="error-text">{errors.hora_fin}</span>}
                 </>
@@ -500,10 +629,10 @@ export default function CitaModal({ isOpen, onClose, onSubmit, initialData, isLo
 
           <div className="form-row" style={{display: 'flex', flexDirection: 'column', gap: '0.75rem'}}>
             <div className="form-group">
-              {readOnly ? (
+              {isReadOnly ? (
                 <>
                   <ReadRow label="Tratamiento:" value={getTratamientosLabel(tratamientos, formData.tratamientos)} />
-                  <ReadRow label="Monto:" value={`$${Number(formData.precio || computedPrecio).toFixed(2)}`} />
+                  <ReadRow label="Monto:" value={formatCurrency(formData.precio || computedPrecio)} />
                   <ReadRow label="Estado:" value={formData.estado || '-'} />
                 </>
               ) : (
@@ -530,9 +659,10 @@ export default function CitaModal({ isOpen, onClose, onSubmit, initialData, isLo
                     value={isPrecioEdited ? formData.precio : computedPrecio.toFixed(2)}
                     step="0.01"
                     min="0"
+                    max="9999.99"
                     placeholder="0.00"
                     onChange={(e) => {
-                      const v = sanitizeDecimal(e.target.value);
+                      const v = e.target.value;
                       // marcar como editado sólo si el usuario dejó un valor no vacío
                       setIsPrecioEdited(String(v).trim() !== '');
                       setFormData((prev) => ({ ...prev, precio: v }));
@@ -540,7 +670,9 @@ export default function CitaModal({ isOpen, onClose, onSubmit, initialData, isLo
                         setErrors((prev) => ({ ...prev, precio: '' }));
                       }
                     }}
+                    onBlur={() => validateField('precio')}
                   />
+                  {errors.precio && <span className="error-text">{errors.precio}</span>}
 
                   <label htmlFor="estado">Estado</label>
                   <select
@@ -555,7 +687,7 @@ export default function CitaModal({ isOpen, onClose, onSubmit, initialData, isLo
                     <option value="cancelada">Cancelada</option>
                   </select>
                   {/* Mostrar sección de pago directamente debajo del campo Estado cuando corresponde */}
-                  {!readOnly && isPaymentModalOpen && (
+                  {!isReadOnly && isPaymentModalOpen && (
                     <div className="payment-section" style={{ padding: '1rem', border: '1px solid #eee', borderRadius: '6px', marginTop: '0.75rem' }}>
                       <h3 style={{ margin: 0, marginBottom: '0.5rem' }}>Registrar pago</h3>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
@@ -564,6 +696,7 @@ export default function CitaModal({ isOpen, onClose, onSubmit, initialData, isLo
                           <select id="metodo_pago" value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} style={{ width: '100%', padding: '0.5rem' }}>
                             <option value="efectivo">Efectivo</option>
                             <option value="transferencia">Transferencia</option>
+                            <option value="deposito">Depósito bancario</option>
                             <option value="tarjeta">Tarjeta</option>
                           </select>
                           {paymentErrors.metodo && <span className="error-text">{paymentErrors.metodo}</span>}
@@ -571,7 +704,7 @@ export default function CitaModal({ isOpen, onClose, onSubmit, initialData, isLo
 
                         <div className="form-group">
                           <label htmlFor="detalle_pago">Detalle</label>
-                          <textarea id="detalle_pago" rows={3} value={paymentDetail} onChange={(e) => setPaymentDetail(sanitizeText(e.target.value, 300))} placeholder="Descripción breve del pago (opcional)" style={{ width: '100%', padding: '0.5rem' }} maxLength={300} />
+                          <textarea id="detalle_pago" rows={3} value={paymentDetail} onChange={(e) => setPaymentDetail(e.target.value)} placeholder="Descripción breve del pago (opcional)" style={{ width: '100%', padding: '0.5rem' }} />
                         </div>
 
                         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
@@ -593,10 +726,10 @@ export default function CitaModal({ isOpen, onClose, onSubmit, initialData, isLo
               setPaymentDetail('');
               setPaymentErrors({});
               onClose();
-            }} className={readOnly ? 'btn btn-secondary btn-detail-close' : 'btn btn-secondary btn-modal-cancel'}>
-              {readOnly ? 'Cerrar' : 'Cancelar'}
+            }} className={isReadOnly ? 'btn btn-secondary btn-detail-close' : 'btn btn-secondary btn-modal-cancel'}>
+              {isReadOnly ? 'Cerrar' : 'Cancelar'}
             </button>
-            {!readOnly && (
+            {!isReadOnly && (
               <button type="submit" className="btn btn-primary btn-modal-save" disabled={isLoading}>
                 {isLoading ? 'Guardando...' : 'Guardar'}
               </button>
@@ -606,7 +739,7 @@ export default function CitaModal({ isOpen, onClose, onSubmit, initialData, isLo
 
         {/* payment section moved to appear below Estado select */}
 
-        {!readOnly && isTratamientoSelectorOpen && (
+        {!isReadOnly && isTratamientoSelectorOpen && (
           <div className="modal-overlay modal-overlay--nested" onClick={() => setIsTratamientoSelectorOpen(false)}>
             <div className="modal-content modal-content--selector" onClick={(event) => event.stopPropagation()}>
               <div className="modal-header">
@@ -625,7 +758,7 @@ export default function CitaModal({ isOpen, onClose, onSubmit, initialData, isLo
                     className="search-input"
                     placeholder="Buscar por nombre, área o descripción..."
                     value={tratamientoSelectorSearch}
-                    onChange={(event) => setTratamientoSelectorSearch(sanitizeText(event.target.value, 100))}
+                    onChange={(event) => setTratamientoSelectorSearch(event.target.value)}
                   />
                 </div>
 
@@ -678,7 +811,7 @@ export default function CitaModal({ isOpen, onClose, onSubmit, initialData, isLo
                       ? `${formData.tratamientos.length} tratamiento(s) seleccionados`
                       : 'Selecciona uno o varios tratamientos'}
                   </div>
-                  <button type="button" className="btn btn-secondary" onClick={() => setIsTratamientoSelectorOpen(false)}>
+                  <button type="button" className="btn btn-secondary btn-modal-cancel" onClick={() => setIsTratamientoSelectorOpen(false)}>
                     Cerrar
                   </button>
                 </div>

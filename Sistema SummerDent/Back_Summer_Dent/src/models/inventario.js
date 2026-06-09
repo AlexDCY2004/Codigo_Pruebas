@@ -1,5 +1,6 @@
 import { DataTypes } from 'sequelize';
 import { sequelize } from '../configuracionesDB/database.js';
+import Sede from './sede.js';
 import Producto from './producto.js';
 
 export const Inventario = sequelize.define(
@@ -19,6 +20,10 @@ export const Inventario = sequelize.define(
     },
     id_perfil: {
       type: DataTypes.UUID,
+      allowNull: true
+    },
+    sede_id: {
+      type: DataTypes.INTEGER,
       allowNull: true
     },
     stock_producto: {
@@ -67,5 +72,9 @@ export const Inventario = sequelize.define(
 // Asociaciones: Inventario pertenece a Producto (fk: id_producto)
 Inventario.belongsTo(Producto, { foreignKey: 'id_producto', as: 'producto' });
 Producto.hasMany(Inventario, { foreignKey: 'id_producto', as: 'inventarios' });
+
+
+Inventario.belongsTo(Sede, { foreignKey: 'sede_id', as: 'sede' });
+Sede.hasMany(Inventario, { foreignKey: 'sede_id', as: 'inventarios_sede' });
 
 export default Inventario;

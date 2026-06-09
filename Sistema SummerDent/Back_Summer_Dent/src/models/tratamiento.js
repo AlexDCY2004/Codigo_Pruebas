@@ -2,13 +2,14 @@ import { DataTypes } from 'sequelize';
 import { sequelize } from '../configuracionesDB/database.js';
 
 const ALLOWED_AREAS = [
-  'Ortodoncia General',
+  'Odontología General',
   'Ortodoncia',
   'Ortopedia',
   'Cirugía Odontológica',
   'Endodoncia',
   'Prótesis Removible Valplast o Flexible',
-  'Acrílicas'
+  'Acrílicas',
+  'Prótesis Cromo Cobalto'
 ];
 
 export const Tratamiento = sequelize.define(
@@ -44,6 +45,11 @@ export const Tratamiento = sequelize.define(
       type: DataTypes.STRING(300),
       allowNull: true
     },
+    sede_id: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      validate: { isInt: { msg: 'sede_id debe ser un entero' } }
+    },
     created_at: {
       type: DataTypes.DATE,
       allowNull: false,
@@ -57,3 +63,7 @@ export const Tratamiento = sequelize.define(
 );
 
 export default Tratamiento;
+
+import Sede from './sede.js';
+Tratamiento.belongsTo(Sede, { foreignKey: 'sede_id', as: 'sede' });
+Sede.hasMany(Tratamiento, { foreignKey: 'sede_id', as: 'tratamientos_sede' });

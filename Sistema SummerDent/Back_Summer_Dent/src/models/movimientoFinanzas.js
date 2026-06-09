@@ -14,6 +14,10 @@ export const MovimientoFinanzas = sequelize.define(
       type: DataTypes.UUID,
       allowNull: true
     },
+    sede_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true
+    },
     id_doctor: {
       type: DataTypes.INTEGER,
       allowNull: true,
@@ -42,6 +46,11 @@ export const MovimientoFinanzas = sequelize.define(
       type: DataTypes.TEXT,
       allowNull: true
     },
+    metodo_pago: {
+      type: DataTypes.STRING(20),
+      allowNull: true,
+      validate: { isIn: { args: [['efectivo','transferencia','tarjeta']], msg: 'metodo_pago inválido' } }
+    },
     fecha: {
       type: DataTypes.DATEONLY,
       allowNull: false,
@@ -63,5 +72,9 @@ export const MovimientoFinanzas = sequelize.define(
 // Asociaciones: movimiento_finanzas puede apuntar a un doctor
 MovimientoFinanzas.belongsTo(Doctor, { foreignKey: 'id_doctor', as: 'doctor' });
 Doctor.hasMany(MovimientoFinanzas, { foreignKey: 'id_doctor', as: 'movimientos_financieros' });
+
+import Sede from './sede.js';
+MovimientoFinanzas.belongsTo(Sede, { foreignKey: 'sede_id', as: 'sede' });
+Sede.hasMany(MovimientoFinanzas, { foreignKey: 'sede_id', as: 'movimientos' });
 
 export default MovimientoFinanzas;

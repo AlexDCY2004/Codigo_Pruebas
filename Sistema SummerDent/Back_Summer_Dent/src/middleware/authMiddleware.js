@@ -1,5 +1,6 @@
 
 import jwt from 'jsonwebtoken';
+import { getAuthTokenFromReq } from '../utils/authUtils.js';
 
 const jwtSecret = process.env.SUPABASE_JWT_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -9,15 +10,13 @@ if (!jwtSecret) {
 }
 
 export const verifyToken = (req, res, next) => {
-  const header = req.headers.authorization || '';
-  if (!header.startsWith('Bearer ')) {
+  const token = getAuthTokenFromReq(req);
+  if (!token) {
     return res.status(401).json({ error: 'Token no proporcionado' });
   }
 
-  const token = header.replace('Bearer ', '').trim();
-
   try {
-    if (!jwtSecret) throw new Error('JWT secret no configurado');
+    if (!jwtSecret) throw new Error('JWT secret no configurado correctamente');
     const payload = jwt.verify(token, jwtSecret, { algorithms: ['HS256'] });
     req.user = payload; // payload.sub is el user id en Supabase
     return next();

@@ -1,5 +1,6 @@
 import { DataTypes } from 'sequelize';
 import { sequelize } from '../configuracionesDB/database.js';
+import Sede from './sede.js';
 
 export const Producto = sequelize.define(
     'Producto',
@@ -15,8 +16,8 @@ export const Producto = sequelize.define(
             validate: {
                 notEmpty: { msg: 'El nombre del producto es obligatorio' },
                 len: {
-                    args: [2, 150],
-                    msg: 'El nombre debe tener entre 2 y 150 caracteres'
+                    args: [2, 32],
+                    msg: 'El nombre debe tener entre 2 y 32 caracteres'
                 }
             }
         },
@@ -48,6 +49,11 @@ export const Producto = sequelize.define(
             allowNull: false,
             defaultValue: DataTypes.NOW
         }
+        ,
+        sede_id: {
+            type: DataTypes.INTEGER,
+            allowNull: true
+        }
     },
     {
         tableName: 'producto',
@@ -57,3 +63,6 @@ export const Producto = sequelize.define(
 );
 
 export default Producto;
+
+Producto.belongsTo(Sede, { foreignKey: 'sede_id', as: 'sede' });
+Sede.hasMany(Producto, { foreignKey: 'sede_id', as: 'productos' });

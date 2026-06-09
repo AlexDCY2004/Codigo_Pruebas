@@ -23,7 +23,7 @@ export default function InventarioModal({
   const isEditing = Boolean(initialData?.id);
 
   const formKey = isEditing
-    ? `inventario-edit-${initialData.id}-${initialData.id_producto ?? 'sin-producto'}-${initialData.stock_producto ?? 'sin-stock'}-${initialData.stock_minimo ?? 'sin-minimo'}`
+    ? `inventario-edit-${initialData.id}-${initialData.id_producto ?? 'sin-producto'}-${initialData.stock_producto ?? 'sin-stock'}-${initialData.stock_minimo ?? 'sin-minimo'}-${initialData.fecha_caducidad ?? 'sin-caducidad'}`
     : 'inventario-new';
 
   const formatCurrency = (value) => {
@@ -48,6 +48,7 @@ export default function InventarioModal({
     const nombre = formValues.nombre?.trim() || '';
     const stockProducto = formValues.stock_producto?.trim() || '';
     const stockMinimo = formValues.stock_minimo?.trim() || '';
+    const fechaCaducidad = formValues.fecha_caducidad?.trim() || '';
     const registrarMovimiento = Boolean(formValues.registrarMovimiento);
     const cantidad = formValues.cantidad?.trim() || '';
     const descripcion = formValues.descripcion?.trim() || '';
@@ -70,21 +71,31 @@ export default function InventarioModal({
 
     if (!stockProducto && !isEditing) {
       nextErrors.stock_producto = 'El stock actual es obligatorio';
-    } else if (stockProducto !== '' && (!/^\d+$/.test(stockProducto) || Number(stockProducto) < 0)) {
-      nextErrors.stock_producto = 'El stock actual debe ser un entero >= 0';
+    } else if (stockProducto !== '' && (!/^\d{1,3}$/.test(stockProducto) || Number(stockProducto) < 0)) {
+      nextErrors.stock_producto = 'El stock actual debe ser un entero entre 0 y 999';
     }
 
     if (stockMinimo === '') {
       nextErrors.stock_minimo = 'El stock mínimo es obligatorio';
-    } else if (!/^\d+$/.test(stockMinimo) || Number(stockMinimo) < 0) {
-      nextErrors.stock_minimo = 'El stock mínimo debe ser un entero >= 0';
+    } else if (!/^\d{1,3}$/.test(stockMinimo) || Number(stockMinimo) < 0) {
+      nextErrors.stock_minimo = 'El stock mínimo debe ser un entero entre 0 y 999';
+    }
+
+    const maxDate = getMaxInputDate();
+
+    if (fechaCaducidad && !/^\d{4}-\d{2}-\d{2}$/.test(fechaCaducidad)) {
+      nextErrors.fecha_caducidad = 'La fecha de caducidad debe tener formato YYYY-MM-DD';
+    } else if (fechaCaducidad && fechaCaducidad < today) {
+      nextErrors.fecha_caducidad = 'La fecha de caducidad no puede ser anterior a la fecha actual';
+    } else if (fechaCaducidad && fechaCaducidad > maxDate) {
+      nextErrors.fecha_caducidad = 'La fecha de caducidad no puede ser mayor a 5 años desde hoy';
     }
 
     if (registrarMovimiento) {
       if (!cantidad) {
         nextErrors.cantidad = 'La cantidad es obligatoria';
-      } else if (!/^\d+$/.test(cantidad) || Number(cantidad) <= 0) {
-        nextErrors.cantidad = 'La cantidad debe ser un entero mayor que 0';
+      } else if (!/^\d{1,3}$/.test(cantidad) || Number(cantidad) <= 0) {
+        nextErrors.cantidad = 'La cantidad debe ser un entero entre 1 y 999';
       }
     }
 
@@ -101,6 +112,96 @@ export default function InventarioModal({
         [name]: ''
       }));
     }
+  };
+
+  const validateField = (fieldName, value) => {
+    const nextErrors = { ...errors };
+    if (fieldName === 'precio') {
+      const v = String(value || '').trim();
+      if (!v) nextErrors.precio = 'El precio es obligatorio';
+      else if (!/^\d{1,4}(?:\.\d{1,2})?$/.test(v)) nextErrors.precio = 'El precio debe tener hasta 4 dígitos y hasta 2 decimales';
+      else if (Number(v) > 9999.99) nextErrors.precio = 'El precio no puede ser mayor a 9999.99';
+      else delete nextErrors.precio;
+    }
+    setErrors(nextErrors);
+  };
+
+  const sanitizePrecioInput = (raw) => {
+    const s = String(raw || '');
+    // allow digits and single dot
+    let cleaned = s.replace(/[^0-9.]/g, '');
+    if (!cleaned) return '';
+    const firstDot = cleaned.indexOf('.');
+    if (firstDot !== -1) {
+      cleaned = cleaned.slice(0, firstDot + 1) + cleaned.slice(firstDot + 1).replace(/\./g, '');
+    }
+    const parts = cleaned.split('.');
+    let intPart = parts[0] || '';
+    let decPart = parts[1] || '';
+    intPart = intPart.slice(0, 4); // up to 4 integer digits
+    decPart = decPart.slice(0, 2); // up to 2 decimals
+    if (cleaned.endsWith('.') && decPart === '') {
+      if (intPart === '') return '0.';
+      return `${intPart}.`;
+    }
+    if (decPart) return `${intPart}.${decPart}`;
+    return intPart;
+  };
+
+  const handlePrecioChange = (event) => {
+    const { value } = event.target;
+    const sanitized = sanitizePrecioInput(value);
+    event.target.value = sanitized;
+    handleChange(event);
+  };
+
+  const handlePrecioPaste = (event) => {
+    event.preventDefault();
+    const paste = (event.clipboardData || window.clipboardData).getData('text') || '';
+    const sanitized = sanitizePrecioInput(paste);
+    event.target.value = sanitized;
+    handleChange(event);
+  };
+
+  const sanitizeInteger3Input = (raw) => {
+    const s = String(raw || '');
+    const cleaned = s.replace(/[^0-9]/g, '');
+    return cleaned.slice(0, 3);
+  };
+
+  const handleInteger3Change = (event) => {
+    const { value } = event.target;
+    const sanitized = sanitizeInteger3Input(value);
+    event.target.value = sanitized;
+    handleChange(event);
+  };
+
+  const handleInteger3Paste = (event) => {
+    event.preventDefault();
+    const paste = (event.clipboardData || window.clipboardData).getData('text') || '';
+    const sanitized = sanitizeInteger3Input(paste);
+    event.target.value = sanitized;
+    handleChange(event);
+  };
+
+  const sanitizeLettersInput = (raw) => {
+    const cleaned = String(raw || '').replace(/[^A-Za-zÁÉÍÓÚáéíóúÑñ\s]/g, '');
+    return cleaned;
+  };
+
+  const handleLettersChange = (event) => {
+    const { value } = event.target;
+    const sanitized = sanitizeLettersInput(value);
+    event.target.value = sanitized;
+    handleChange(event);
+  };
+
+  const handleLettersPaste = (event) => {
+    event.preventDefault();
+    const paste = (event.clipboardData || window.clipboardData).getData('text') || '';
+    const sanitized = sanitizeLettersInput(paste);
+    event.target.value = sanitized;
+    handleChange(event);
   };
 
   const handleSubmit = (event) => {
@@ -120,6 +221,7 @@ export default function InventarioModal({
       precio: formValues.precio !== undefined && formValues.precio !== '' ? formValues.precio : undefined,
       stock_producto: formValues.stock_producto !== '' ? Number(formValues.stock_producto) : undefined,
       stock_minimo: Number(formValues.stock_minimo),
+      fecha_caducidad: formValues.fecha_caducidad || undefined,
       registrarMovimiento: Boolean(formValues.registrarMovimiento),
       tipo_movimiento: formValues.tipo_movimiento || 'entrada',
       cantidad: formValues.cantidad !== '' ? Number(formValues.cantidad) : undefined
@@ -149,6 +251,7 @@ export default function InventarioModal({
                   : initialData?.producto?.precio
               )}
             />
+            <ReadRow label="Fecha de caducidad:" value={formatDate(initialData?.fecha_caducidad)} />
             <ReadRow label="Cantidad Actual:" value={initialData?.stock_producto !== undefined ? String(initialData.stock_producto) : '0'} />
             <ReadRow label="Stock Mínimo:" value={initialData?.stock_minimo !== undefined ? String(initialData.stock_minimo) : '0'} />
 

@@ -1,7 +1,10 @@
 import { supabaseAdmin, getSupabaseClientWithToken } from '../configuracionesDB/supabaseClient.js';
+import { getPerfilFromToken } from '../utils/perfilUtils.js';
+import { getAuthTokenFromReq } from '../utils/authUtils.js';
 
 const cedulaRegex = /^\d{10}$/;
 const telefonoRegex = /^\d{10}$/;
+const telefonoRepetidosRegex = /(\d)\1{3,}/; // detecta 4 o más dígitos iguales consecutivos
 const correoRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const nombreRegex = /^[A-Za-zÁÉÍÓÚáéíóúÑñ]+(?:[ '\-][A-Za-zÁÉÍÓÚáéíóúÑñ]+)*$/;
 
@@ -39,7 +42,9 @@ const esTelefonoValido = (telefono) => {
   if (telefono === undefined || telefono === null || telefono === '') return true;
   if (typeof telefono !== 'string' && typeof telefono !== 'number') return false;
   const limpio = String(telefono).trim();
-  return telefonoRegex.test(limpio);
+  if (!telefonoRegex.test(limpio)) return false;
+  if (telefonoRepetidosRegex.test(limpio)) return false;
+  return true;
 };
 
 const esNombreValido = (valor) => {
@@ -73,10 +78,11 @@ const esFechaNacimientoValida = (fecha) => {
 
 export const crearPacienteController = async (req, res) => {
   try {
-    const token = (req.headers.authorization || '').startsWith('Bearer ') ? req.headers.authorization.replace('Bearer ', '').trim() : null;
+    const token = getAuthTokenFromReq(req);
     if (!token) return res.status(401).json({ error: 'Token no proporcionado' });
 
     const supabaseUser = getSupabaseClientWithToken(token);
+    const perfil = await getPerfilFromToken(token);
     const { id_cedula, nombre, apellido, fecha_nacimiento, telefono, correo, direccion } = req.body;
 
     if (typeof req.body !== 'object' || req.body === null || Array.isArray(req.body)) {
@@ -88,14 +94,26 @@ export const crearPacienteController = async (req, res) => {
     if (!apellido || !String(apellido).trim()) return res.status(400).json({ error: 'El apellido es obligatorio' });
 
     if (!esCedulaValida(id_cedula)) return res.status(400).json({ error: 'Cédula inválida' });
-    if (!esTextoValido(nombre, 2, 64)) return res.status(400).json({ error: 'El nombre debe tener entre 2 y 64 caracteres' });
-    if (!esTextoValido(apellido, 2, 64)) return res.status(400).json({ error: 'El apellido debe tener entre 2 y 64 caracteres' });
+    if (!esTextoValido(nombre, 2, 15)) return res.status(400).json({ error: 'El nombre debe tener entre 2 y 15 caracteres' });
+    if (!esTextoValido(apellido, 2, 15)) return res.status(400).json({ error: 'El apellido debe tener entre 2 y 15 caracteres' });
     if (!esNombreValido(nombre)) return res.status(400).json({ error: 'El nombre solo debe contener letras y espacios' });
     if (!esNombreValido(apellido)) return res.status(400).json({ error: 'El apellido solo debe contener letras y espacios' });
     if (!esFechaNacimientoValida(fecha_nacimiento)) return res.status(400).json({ error: 'La fecha de nacimiento es obligatoria, debe estar en formato YYYY-MM-DD y no puede ser futura' });
-    if (!esTelefonoValido(telefono)) return res.status(400).json({ error: 'El teléfono debe contener solo 10 dígitos' });
+    if (!esTelefonoValido(telefono)) return res.status(400).json({ error: 'El teléfono debe contener solo 10 dígitos y no puede tener más de 3 dígitos iguales consecutivos' });
     if (!esCorreoValido(correo)) return res.status(400).json({ error: 'El correo debe tener @' });
     if (direccion !== undefined && direccion !== null && !esTextoValido(String(direccion), 1, 255)) return res.status(400).json({ error: 'La dirección no puede estar vacía y no debe exceder 255 caracteres' });
+
+    const correoLimpio = correo ? String(correo).trim().toLowerCase() : '';
+    if (correoLimpio) {
+      const { data: correoExistente, error: correoErr } = await supabaseAdmin
+        .from('paciente')
+        .select('id_cedula, correo')
+        .eq('correo', correoLimpio)
+        .maybeSingle();
+
+      if (correoErr) return res.status(500).json({ error: correoErr.message || correoErr });
+      if (correoExistente) return res.status(409).json({ error: 'El correo ya existe' });
+    }
 
     // Verificar existencia (con token del usuario — RLS se aplicará)
     const { data: existente, error: existErr } = await supabaseUser
@@ -105,25 +123,38 @@ export const crearPacienteController = async (req, res) => {
       .maybeSingle();
 
     if (existErr) return res.status(500).json({ error: existErr.message });
-    if (existente) return res.status(409).json({ error: 'Paciente con esa cédula ya existe' });
+    if (existente) return res.status(409).json({ error: 'Ya existe un paciente registrado con esa cédula' });
 
-    const { data, error } = await supabaseUser
-      .from('paciente')
-      .insert([
-        {
-          id_cedula: String(id_cedula).trim(),
-          nombre: String(nombre).trim(),
-          apellido: String(apellido).trim(),
-          fecha_nacimiento: fecha_nacimiento ? String(fecha_nacimiento) : null,
-          telefono: telefono ? String(telefono).trim() : null,
-          correo: correo ? String(correo).trim() : null,
-          direccion: direccion ? String(direccion).trim() : null
-        }
-      ])
-      .select()
-      .maybeSingle();
+    const pacientePayload = {
+      id_cedula: String(id_cedula).trim(),
+      nombre: String(nombre).trim(),
+      apellido: String(apellido).trim(),
+      fecha_nacimiento: fecha_nacimiento ? String(fecha_nacimiento) : null,
+      telefono: telefono ? String(telefono).trim() : null,
+      correo: correoLimpio || null,
+      direccion: direccion ? String(direccion).trim() : null
+    };
 
-    if (error) return res.status(400).json({ error: error.message || error });
+    // asignar sede_id según perfil (administrador) o desde body si superadmin
+    let sedeToUse = null;
+    if (perfil && perfil.rol === 'superadmin') {
+      if (req.body && req.body.sede_id) sedeToUse = Number(req.body.sede_id);
+    } else if (perfil && perfil.sede_id) {
+      sedeToUse = perfil.sede_id;
+    }
+    if (sedeToUse !== null) pacientePayload.sede_id = sedeToUse;
+
+    const { data, error } = await supabaseUser.from('paciente').insert([pacientePayload]).select().maybeSingle();
+
+    if (error) {
+      const errorCode = String(error.code || '');
+      const errorConstraint = String(error?.message || '');
+      if (errorCode === '23505' || errorConstraint.includes('paciente_pkey')) {
+        return res.status(409).json({ error: 'Ya existe un paciente registrado con esa cédula' });
+      }
+
+      return res.status(400).json({ error: error.message || error });
+    }
 
     return res.status(201).json({ mensaje: 'Paciente creado', paciente: data });
   } catch (error) {
@@ -133,11 +164,18 @@ export const crearPacienteController = async (req, res) => {
 
 export const obtenerPacientesController = async (req, res) => {
   try {
-    const token = (req.headers.authorization || '').startsWith('Bearer ') ? req.headers.authorization.replace('Bearer ', '').trim() : null;
+    const token = getAuthTokenFromReq(req);
     if (!token) return res.status(401).json({ error: 'Token no proporcionado' });
 
     const supabaseUser = getSupabaseClientWithToken(token);
-    const { data, error } = await supabaseUser.from('paciente').select('*').order('created_at', { ascending: false });
+    const sedeId = req && req.query ? req.query.sede_id : null;
+    let query = supabaseUser.from('paciente').select('*').order('created_at', { ascending: false });
+    if (sedeId !== undefined && sedeId !== null && String(sedeId).trim() !== '') {
+      const sid = Number(sedeId);
+      if (!Number.isNaN(sid)) query = query.eq('sede_id', sid);
+    }
+
+    const { data, error } = await query;
     if (error) return res.status(500).json({ error: error.message || error });
     return res.json(data);
   } catch (error) {
@@ -147,7 +185,7 @@ export const obtenerPacientesController = async (req, res) => {
 
 export const obtenerPacientePorIdController = async (req, res) => {
   try {
-    const token = (req.headers.authorization || '').startsWith('Bearer ') ? req.headers.authorization.replace('Bearer ', '').trim() : null;
+    const token = getAuthTokenFromReq(req);
     if (!token) return res.status(401).json({ error: 'Token no proporcionado' });
 
     const supabaseUser = getSupabaseClientWithToken(token);
@@ -166,10 +204,11 @@ export const obtenerPacientePorIdController = async (req, res) => {
 
 export const actualizarPacienteController = async (req, res) => {
   try {
-    const token = (req.headers.authorization || '').startsWith('Bearer ') ? req.headers.authorization.replace('Bearer ', '').trim() : null;
+    const token = getAuthTokenFromReq(req);
     if (!token) return res.status(401).json({ error: 'Token no proporcionado' });
 
     const supabaseUser = getSupabaseClientWithToken(token);
+    const perfil = await getPerfilFromToken(token);
     const { id } = req.params;
     const { id_cedula, nombre, apellido, fecha_nacimiento, telefono, correo, direccion } = req.body;
 
@@ -180,6 +219,9 @@ export const actualizarPacienteController = async (req, res) => {
     }
 
     const camposPermitidos = ['id_cedula', 'nombre', 'apellido', 'fecha_nacimiento', 'telefono', 'correo', 'direccion'];
+    if (perfil && perfil.rol === 'superadmin') {
+      camposPermitidos.push('sede_id');
+    }
     const camposRecibidos = Object.keys(req.body || {});
 
     if (camposRecibidos.length === 0) {
@@ -191,7 +233,7 @@ export const actualizarPacienteController = async (req, res) => {
       return res.status(400).json({ error: `Campos no permitidos: ${camposNoPermitidos.join(', ')}` });
     }
 
-    const { data: existing, error: fetchErr } = await supabaseUser.from('paciente').select('id_cedula').eq('id_cedula', id).maybeSingle();
+    const { data: existing, error: fetchErr } = await supabaseUser.from('paciente').select('id_cedula, correo').eq('id_cedula', id).maybeSingle();
     if (fetchErr) return res.status(500).json({ error: fetchErr.message || fetchErr });
     if (!existing) return res.status(404).json({ error: 'Paciente no encontrado' });
 
@@ -207,20 +249,34 @@ export const actualizarPacienteController = async (req, res) => {
           .maybeSingle();
 
         if (cedulaErr) return res.status(500).json({ error: cedulaErr.message || cedulaErr });
-        if (cedulaExistente) return res.status(409).json({ error: 'Ya existe un paciente con esa nueva cédula' });
+        if (cedulaExistente) return res.status(409).json({ error: 'Ya existe un paciente registrado con esa cédula' });
       }
     }
 
     if (nombre !== undefined && !String(nombre).trim()) return res.status(400).json({ error: 'El nombre no puede estar vacío' });
     if (apellido !== undefined && !String(apellido).trim()) return res.status(400).json({ error: 'El apellido no puede estar vacío' });
-    if (nombre !== undefined && !esTextoValido(nombre, 2, 64)) return res.status(400).json({ error: 'El nombre debe tener entre 2 y 64 caracteres' });
-    if (apellido !== undefined && !esTextoValido(apellido, 2, 64)) return res.status(400).json({ error: 'El apellido debe tener entre 2 y 64 caracteres' });
+    if (nombre !== undefined && !esTextoValido(nombre, 2, 15)) return res.status(400).json({ error: 'El nombre debe tener entre 2 y 15 caracteres' });
+    if (apellido !== undefined && !esTextoValido(apellido, 2, 15)) return res.status(400).json({ error: 'El apellido debe tener entre 2 y 15 caracteres' });
     if (nombre !== undefined && !esNombreValido(nombre)) return res.status(400).json({ error: 'El nombre solo debe contener letras y espacios' });
     if (apellido !== undefined && !esNombreValido(apellido)) return res.status(400).json({ error: 'El apellido solo debe contener letras y espacios' });
     if (fecha_nacimiento !== undefined && fecha_nacimiento !== null && fecha_nacimiento !== '' && !esFechaNacimientoValida(fecha_nacimiento)) return res.status(400).json({ error: 'La fecha de nacimiento debe estar en formato YYYY-MM-DD y no puede ser futura' });
-    if (telefono !== undefined && !esTelefonoValido(telefono)) return res.status(400).json({ error: 'El teléfono debe contener solo dígitos y tener exactamente 10 caracteres' });
+    if (telefono !== undefined && !esTelefonoValido(telefono)) return res.status(400).json({ error: 'El teléfono debe contener solo dígitos, tener exactamente 10 caracteres y no puede tener más de 3 dígitos iguales consecutivos' });
     if (correo !== undefined && !esCorreoValido(correo)) return res.status(400).json({ error: 'El correo debe tener formato válido y entre 5 y 64 caracteres' });
     if (direccion !== undefined && direccion !== null && String(direccion).trim() && !esTextoValido(String(direccion), 1, 255)) return res.status(400).json({ error: 'La dirección no debe exceder 255 caracteres' });
+
+    const correoLimpioUpdate = correo !== undefined && correo !== null && String(correo).trim() ? String(correo).trim().toLowerCase() : '';
+    if (correoLimpioUpdate) {
+      const { data: correoExistente, error: correoErr } = await supabaseAdmin
+        .from('paciente')
+        .select('id_cedula, correo')
+        .eq('correo', correoLimpioUpdate)
+        .maybeSingle();
+
+      if (correoErr) return res.status(500).json({ error: correoErr.message || correoErr });
+      if (correoExistente && correoExistente.id_cedula !== id) {
+        return res.status(409).json({ error: 'El correo ya existe' });
+      }
+    }
 
     const updates = {};
     if (id_cedula !== undefined && cedulaNueva !== id) updates.id_cedula = cedulaNueva;
@@ -228,8 +284,16 @@ export const actualizarPacienteController = async (req, res) => {
     if (apellido !== undefined) updates.apellido = String(apellido).trim();
     if (fecha_nacimiento !== undefined) updates.fecha_nacimiento = fecha_nacimiento ? String(fecha_nacimiento) : null;
     if (telefono !== undefined) updates.telefono = telefono ? String(telefono).trim() : null;
-    if (correo !== undefined) updates.correo = correo ? String(correo).trim() : null;
+    if (correo !== undefined) updates.correo = correoLimpioUpdate || null;
     if (direccion !== undefined) updates.direccion = direccion ? String(direccion).trim() : null;
+    if (Object.prototype.hasOwnProperty.call(req.body, 'sede_id')) {
+      if (!(perfil && perfil.rol === 'superadmin')) {
+        return res.status(403).json({ error: 'No autorizado para asignar sede' });
+      }
+      const sedeNum = Number(req.body.sede_id);
+      if (Number.isNaN(sedeNum)) return res.status(400).json({ error: 'sede_id inválido' });
+      updates.sede_id = sedeNum;
+    }
 
     if (Object.keys(updates).length === 0) {
       return res.status(400).json({ error: 'No hay campos válidos para actualizar' });
@@ -246,7 +310,7 @@ export const actualizarPacienteController = async (req, res) => {
 
 export const eliminarPacienteController = async (req, res) => {
   try {
-    const token = (req.headers.authorization || '').startsWith('Bearer ') ? req.headers.authorization.replace('Bearer ', '').trim() : null;
+    const token = getAuthTokenFromReq(req);
     if (!token) return res.status(401).json({ error: 'Token no proporcionado' });
 
     const { id } = req.params;

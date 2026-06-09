@@ -1,297 +1,178 @@
-# 🦷 SummerDent — Sistema de Gestión para Clínica Dental
+# Aplicacion_Summer_Dent
+Sistema para gestión de pacientes y administración del consultorio Summer Dent.
 
-Sistema web completo para la gestión de una clínica dental. Permite administrar pacientes, doctores, citas, tratamientos, inventario de productos y movimientos financieros (ingresos/egresos).
+Este repositorio contiene el backend (API) y el frontend (app React + Vite) de la aplicación.
 
----
+**Estructura principal**
+- [Back_Summer_Dent](Back_Summer_Dent): servidor Node/Express que expone la API y se conecta a Supabase/Postgres.
+- [Front_Summer_Dent](Front_Summer_Dent): cliente en React + Vite que consume la API.
 
-## 📋 Tabla de contenidos
+**Requisitos previos**
+- Node.js >= 18 y `npm` o `pnpm`.
+- (Producción) Una base de datos PostgreSQL o una instancia Supabase.
 
-- [Tecnologías utilizadas](#-tecnologías-utilizadas)
-- [Estructura del proyecto](#-estructura-del-proyecto)
-- [Requisitos previos](#-requisitos-previos)
-- [Instalación y configuración](#-instalación-y-configuración)
-  - [1. Clonar el repositorio](#1-clonar-el-repositorio)
-  - [2. Configurar el Backend](#2-configurar-el-backend)
-  - [3. Configurar el Frontend](#3-configurar-el-frontend)
-- [Ejecución del proyecto](#-ejecución-del-proyecto)
-- [Variables de entorno](#-variables-de-entorno)
-- [Endpoints de la API](#-endpoints-de-la-api)
-- [Scripts disponibles](#-scripts-disponibles)
+## Configuración rápida
 
----
+1) Clonar el repositorio (ya estás en la copia local en este equipo).
 
-## 🛠 Tecnologías utilizadas
-
-### Backend
-| Tecnología | Descripción |
-|---|---|
-| **Node.js** | Entorno de ejecución de JavaScript |
-| **Express 5** | Framework web para la API REST |
-| **Supabase** | Base de datos PostgreSQL en la nube (autenticación y almacenamiento) |
-| **Sequelize** | ORM para PostgreSQL (opcional) |
-| **dotenv** | Manejo de variables de entorno |
-| **cors** | Manejo de políticas CORS |
-| **nodemon** | Reinicio automático del servidor en desarrollo |
-
-### Frontend
-| Tecnología | Descripción |
-|---|---|
-| **React 19** | Biblioteca para la interfaz de usuario |
-| **Vite 8** | Bundler y servidor de desarrollo |
-| **React Router DOM 7** | Enrutamiento del lado del cliente |
-| **Axios** | Cliente HTTP para consumo de la API |
-| **Zustand** | Manejo de estado global (autenticación) |
-| **TanStack React Query** | Manejo de estado del servidor y caché |
-| **Lucide React** | Iconos SVG |
-
----
-
-## 📁 Estructura del proyecto
-
-```
-Codigo_Pruebas/
-├── README.md
-└── Sistema SummerDent/
-    ├── .gitignore
-    ├── Back_Summer_Dent/          # API REST (Backend)
-    │   ├── app.js                 # Punto de entrada del servidor
-    │   ├── package.json
-    │   └── src/
-    │       ├── configuracionesDB/ # Conexión a Supabase y Sequelize
-    │       ├── controllers/       # Lógica de negocio
-    │       ├── middleware/        # Middleware de autenticación
-    │       ├── models/            # Modelos de datos
-    │       └── routes/            # Definición de rutas
-    └── Front_Summer_Dent/         # Interfaz de usuario (Frontend)
-        ├── index.html
-        ├── vite.config.js
-        ├── package.json
-        └── src/
-            ├── app/               # Providers y router
-            ├── components/        # Componentes reutilizables
-            ├── pages/             # Páginas de la aplicación
-            ├── services/api/      # Clientes HTTP (Axios)
-            ├── store/             # Estado global (Zustand)
-            ├── styles/            # Archivos CSS
-            └── lib/               # Utilidades
-```
-
----
-
-## ✅ Requisitos previos
-
-Antes de comenzar, asegúrate de tener instalado:
-
-- **Node.js** (versión 18 o superior) — [Descargar aquí](https://nodejs.org/)
-- **npm** (incluido con Node.js)
-- **Git** — [Descargar aquí](https://git-scm.com/)
-- Una cuenta en **Supabase** con un proyecto creado — [supabase.com](https://supabase.com/)
-
-Para verificar que tienes Node.js y npm instalados, ejecuta en tu terminal:
-
-```bash
-node -v
-npm -v
-```
-
----
-
-## 🚀 Instalación y configuración
-
-### 1. Clonar el repositorio
-
-```bash
-git clone https://github.com/AlexDCY2004/Codigo_Pruebas.git
-cd Codigo_Pruebas
-```
-
----
-
-### 2. Configurar el Backend
-
-#### 2.1 Instalar dependencias
+2) Backend — instalar dependencias y configurar variables de entorno
 
 ```bash
 cd "Sistema SummerDent/Back_Summer_Dent"
 npm install
 ```
 
-#### 2.2 Crear archivo de variables de entorno
+Crear un archivo `.env` en la carpeta `Back_Summer_Dent` con las variables necesarias (ejemplo mínimo):
 
-Crea un archivo `.env` en la carpeta `Back_Summer_Dent/` con el siguiente contenido:
-
-```env
-# Puerto del servidor (por defecto: 5000)
+```
 PORT=5000
-
-# URL del proyecto en Supabase
-SUPABASE_URL=https://tu-proyecto.supabase.co
-
-# Clave pública (anon key) de Supabase
-SUPABASE_ANON_KEY=tu_anon_key_aqui
-
-# Clave de servicio (service role key) de Supabase
-SUPABASE_SERVICE_ROLE_KEY=tu_service_role_key_aqui
-
-# (Opcional) URL de conexión directa a la base de datos PostgreSQL de Supabase
-# Si la defines, Sequelize la usará en lugar de los parámetros individuales
-# SUPABASE_DB_URL=postgresql://postgres:password@host:5432/postgres
-
-# (Opcional) Parámetros individuales de conexión a la BD (si no usas SUPABASE_DB_URL)
-# DB_HOST=tu_host
-# DB_PORT=5432
-# DB_NAME=postgres
-# DB_USER=postgres
-# DB_PASS=tu_password
-
-# (Opcional) Habilitar Sequelize (por defecto usa solo Supabase Client)
-# USE_SEQUELIZE=true
-
-# (Opcional) URLs del frontend permitidas por CORS (separadas por coma)
-# FRONTEND_URL=http://localhost:5173
+# Conexión a Supabase/Postgres (opcionalmente usa SUPABASE_DB_URL)
+SUPABASE_DB_URL=postgresql://usuario:pass@host:5432/dbname
+# URL del frontend para CORS (opcional, separa por comas)
+FRONTEND_URL=http://localhost:5173
+# Supabase (si se utiliza)
+SUPABASE_URL=https://tu-supabase.supabase.co
+SUPABASE_ANON_KEY=pk.xxx
+SUPABASE_SERVICE_ROLE_KEY=sk.xxx
 ```
 
-> **📌 ¿Dónde obtener las claves de Supabase?**
-> 1. Ve a tu [dashboard de Supabase](https://app.supabase.com/).
-> 2. Selecciona tu proyecto.
-> 3. Ve a **Settings → API**.
-> 4. Copia la **URL**, la **anon key** y la **service role key**.
+Si prefieres configurar host/usuario/contraseña separados en lugar de `SUPABASE_DB_URL`, define `DB_HOST`, `DB_NAME`, `DB_USER`, `DB_PASS`, `DB_PORT`.
 
----
+Comandos útiles para el backend:
 
-### 3. Configurar el Frontend
+```bash
+# Modo desarrollo (con nodemon)
+npm run dev
+# Ejecutar en producción
+npm start
+```
 
-#### 3.1 Instalar dependencias
-
-Abre **otra terminal** y ejecuta:
+3) Frontend — instalar dependencias y configurar URL del backend
 
 ```bash
 cd "Sistema SummerDent/Front_Summer_Dent"
 npm install
 ```
 
-#### 3.2 Crear archivo de variables de entorno (opcional)
+Crear un archivo `.env` en la carpeta `Front_Summer_Dent` con la URL del backend (opcional si usas el valor por defecto `http://localhost:5000`):
 
-Si el backend corre en el puerto por defecto (`5000`), **no necesitas crear este archivo**. El frontend se conectará automáticamente a `http://localhost:5000`.
-
-Si necesitas cambiar la URL del backend, crea un archivo `.env` en la carpeta `Front_Summer_Dent/`:
-
-```env
-# URL del backend (por defecto: http://localhost:5000)
+```
 VITE_BACKEND_URL=http://localhost:5000
 ```
 
----
-
-## ▶ Ejecución del proyecto
-
-Necesitas **dos terminales** abiertas simultáneamente, una para el backend y otra para el frontend.
-
-### Terminal 1 — Iniciar el Backend
+Comandos útiles para el frontend:
 
 ```bash
-cd "Sistema SummerDent/Back_Summer_Dent"
+# Inicia Vite en modo desarrollo
 npm run dev
+# Generar build
+npm run build
+# Ver build localmente
+npm run preview
 ```
 
-Deberías ver un mensaje como:
+## Uso
+- Inicia primero el backend (`Back_Summer_Dent`).
+- Luego inicia el frontend (`Front_Summer_Dent`) y abre `http://localhost:5173` en tu navegador.
+
+## Variables y notas importantes
+- El backend intenta usar `SUPABASE_DB_URL` (recomendado). Si no existe, construye la conexión con `DB_*` o `SUPABASE_DB_*` individuales.
+- CORS: configura `FRONTEND_URL` en el backend para permitir peticiones desde dominios específicos.
+- El frontend usa `VITE_BACKEND_URL` para apuntar a la API.
+
+## Problemas comunes
+- Error de conexión a la base de datos: verifica `SUPABASE_DB_URL` y que la base de datos acepte conexiones (SSL).
+- 401 en peticiones API: revisa que las rutas protegidas requieran token y que el cliente lo esté enviando.
+- CORS: añade la URL del frontend en `FRONTEND_URL` si el navegador bloquea solicitudes.
+
+## Qué contiene este repositorio
+- `Back_Summer_Dent`: API REST en Node/Express que gestiona productos, inventario, citas, pacientes, doctores, tratamientos y movimientos financieros. Se integra con Supabase/Postgres.
+- `Front_Summer_Dent`: Cliente en React (Vite) con vistas para:
+  - Autenticación (`/login`).
+  - Dashboard: resumen del consultorio, accesos rápidos, `Citas de Hoy` y `Próximas Citas`.
+  - Gestión de `Pacientes`, `Citas`, `Doctores`, `Inventario`, `Tratamientos` y `Finanzas`.
+  - Componentes reutilizables: modales para crear/editar (`PacienteModal`, `CitaModal`, `InventarioModal`, etc.), tablas, y elementos UI.
+
+## Cómo usar la aplicación cuando esté corriendo
+1. Accede a la URL del frontend (por defecto `http://localhost:5173`).
+2. Inicia sesión en la ruta de login si la aplicación lo requiere.
+3. Navegación principal:
+	- Usa el menú/side bar para moverte entre `Dashboard`, `Pacientes`, `Citas`, `Doctores`, `Inventario`, `Finanzas` y `Tratamientos`.
+	- En el `Dashboard` encontrarás botones de acceso rápido: `Gestionar Pacientes`, `Ver Citas`, `Registrar Ingreso` y `Revisar Inventario`.
+4. Citas:
+	- `Citas de Hoy`: lista de las citas programadas para el día actual.
+	- `Próximas Citas`: próximas citas programadas (muestra nombre de paciente, fecha, hora y estado).
+	- Para crear o editar una cita, abre el modal correspondiente desde la vista `Citas` o desde botones rápidos.
+5. Pacientes:
+	- Añade, edita o busca pacientes desde la vista `Pacientes`.
+	- Los modales permiten completar nombre, cédula, teléfono y observaciones.
+6. Inventario y Productos:
+	- Revisa stock, registra entradas/salidas y administra productos.
+7. Finanzas:
+	- Registra movimientos (ingresos/egresos) desde la vista `Finanzas` o el acceso rápido del `Dashboard`.
+
+
+## Flujos importantes (ejemplos prácticos)
+
+### 1) Marcar una cita como `Atendida`
+- Endpoint: `PUT /api/citas/:id`
+- Autenticación: requiere header `Authorization: Bearer <token>`.
+- Payload mínimo para marcar como atendida:
+
+```json
+{
+	"estado": "Atendida",
+	"metodo_pago": "efectivo",           // opcional: "efectivo" | "transferencia" | "tarjeta"
+	"detalle_pago": "Pago en caja"       // opcional
+}
 ```
-Iniciando sin Sequelize (usando Supabase).
-Servidor corriendo en el puerto 5000
+
+- Efectos:
+	- El backend actualiza el estado de la cita.
+	- Si la cita cambia a `Atendida`, el servidor intentará crear (o completar) un `movimiento_finanzas` de tipo `ingreso` con el monto de la cita (`precio`).
+	- Si la base de datos tiene triggers que crean el movimiento, el controlador del backend asignará `id_perfil` y `metodo_pago` al movimiento si se envían.
+	- Respuesta: JSON con `{ mensaje: 'Cita actualizada', cita: {...} }`.
+
+### 2) Registrar una venta / salida de inventario (vender un producto)
+- Endpoint: `POST /api/inventario/movimiento`
+- Autenticación: requiere header `Authorization: Bearer <token>`.
+- Payload ejemplo para una venta:
+
+```json
+{
+	"id_producto": 123,
+	"tipo_movimiento": "salida",
+	"cantidad": 2,
+	"metodo_pago": "tarjeta",       // opcional
+	"detalle_pago": "Venta en mostrador"
+}
 ```
 
-### Terminal 2 — Iniciar el Frontend
+- Efectos:
+	- Se verifica stock suficiente; si no hay inventario, el endpoint falla con error.
+	- Se resta la `cantidad` del inventario del producto.
+	- Se crea un `movimiento_finanzas` de tipo `ingreso` por el total (precio_unitario * cantidad).
+	- Respuesta: JSON con `{ mensaje: 'Salida registrada, stock actualizado y movimiento financiero creado', inventario: {...}, movimiento: {...} }`.
 
-```bash
-cd "Sistema SummerDent/Front_Summer_Dent"
-npm run dev
+### 3) Registrar entradas de inventario
+- Endpoint: `POST /api/inventario/aumentar` (o `POST /api/inventario/movimiento` con `tipo_movimiento: 'entrada'`).
+- Payload ejemplo:
+
+```json
+{
+	"id_producto": 123,
+	"cantidad": 10
+}
 ```
 
-Deberías ver un mensaje como:
-```
-  VITE v8.x.x  ready in XXX ms
-
-  ➜  Local:   http://localhost:5173/
-```
-
-### 🌐 Acceder a la aplicación
-
-Abre tu navegador y ve a: **http://localhost:5173**
-
-Serás redirigido a la página de inicio de sesión (`/login`).
+- Efectos: aumenta stock y retorna el inventario actualizado.
 
 ---
+Notas:
+- Todos los endpoints de modificación requieren autenticación (`Bearer token`).
+- En caso de errores (stock insuficiente, IDs inválidos), el backend responde con código HTTP apropiado y un objeto `{ error: 'mensaje' }`.
+- Revisa los controladores en `Back_Summer_Dent/src/controllers/` si necesitas adaptar o extender la lógica (por ejemplo, para cambiar la descripción del movimiento o aplicar descuentos automáticos).
 
-## 🔐 Variables de entorno
 
-### Backend (`Back_Summer_Dent/.env`)
 
-| Variable | Requerida | Descripción |
-|---|---|---|
-| `PORT` | No | Puerto del servidor (default: `5000`) |
-| `SUPABASE_URL` | **Sí** | URL de tu proyecto en Supabase |
-| `SUPABASE_ANON_KEY` | **Sí** | Clave pública (anon) de Supabase |
-| `SUPABASE_SERVICE_ROLE_KEY` | **Sí** | Clave de servicio de Supabase |
-| `SUPABASE_DB_URL` | No | URL de conexión directa a PostgreSQL |
-| `USE_SEQUELIZE` | No | Habilitar Sequelize ORM (`true`/`false`) |
-| `FRONTEND_URL` | No | URLs del frontend para CORS (separadas por coma) |
 
-### Frontend (`Front_Summer_Dent/.env`)
-
-| Variable | Requerida | Descripción |
-|---|---|---|
-| `VITE_BACKEND_URL` | No | URL del backend (default: `http://localhost:5000`) |
-
----
-
-## 📡 Endpoints de la API
-
-El backend expone los siguientes grupos de endpoints bajo `http://localhost:5000`:
-
-| Ruta base | Descripción |
-|---|---|
-| `GET /` | Health check — verificar que la API funciona |
-| `/api/auth` | Autenticación (login, registro) |
-| `/api/productos` | CRUD de productos |
-| `/api/inventario` | Gestión de inventario |
-| `/api/doctores` | CRUD de doctores |
-| `/api/pacientes` | CRUD de pacientes |
-| `/api/tratamientos` | CRUD de tratamientos |
-| `/api/citas` | CRUD de citas |
-| `/api/movimientos-finanzas` | Movimientos financieros (ingresos/egresos) |
-
----
-
-## 📜 Scripts disponibles
-
-### Backend (`Back_Summer_Dent/`)
-
-| Comando | Descripción |
-|---|---|
-| `npm run dev` | Inicia el servidor con **nodemon** (reinicio automático al guardar cambios) |
-| `npm start` | Inicia el servidor con **node** (producción) |
-
-### Frontend (`Front_Summer_Dent/`)
-
-| Comando | Descripción |
-|---|---|
-| `npm run dev` | Inicia el servidor de desarrollo de Vite |
-| `npm run build` | Genera el bundle de producción en `/dist` |
-| `npm run preview` | Previsualiza el build de producción localmente |
-| `npm run lint` | Ejecuta ESLint para revisar el código |
-
----
-
-## 🤝 Contribución
-
-1. Haz un fork del repositorio.
-2. Crea una rama con tu feature: `git checkout -b feature/nueva-funcionalidad`.
-3. Haz commit de tus cambios: `git commit -m 'Agregar nueva funcionalidad'`.
-4. Haz push a la rama: `git push origin feature/nueva-funcionalidad`.
-5. Abre un Pull Request.
-
----
-
-## 📄 Licencia
-
-ISC

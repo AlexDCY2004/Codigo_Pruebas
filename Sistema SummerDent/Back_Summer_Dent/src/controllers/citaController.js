@@ -1,4 +1,7 @@
 import { getSupabaseClientWithToken, supabase, supabaseAdmin } from '../configuracionesDB/supabaseClient.js';
+import { actualizarTotalesCajaParaPeriodo, normalizeMetodoPago } from './movimientoFinanzasController.js';
+import { getPerfilFromToken } from '../utils/perfilUtils.js';
+import { getAuthTokenFromReq } from '../utils/authUtils.js';
 
 const estadosPermitidos = ['agendada', 'confirmada', 'Atendida', 'cancelada'];
 
@@ -12,6 +15,32 @@ const esCedulaValida = (cedula) => {
 
 const esFechaValida = (f) => typeof f === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(f) && !Number.isNaN(new Date(`${f}T00:00:00`).getTime());
 const esHoraValida = (h) => typeof h === 'string' && /^\d{2}:\d{2}(:\d{2})?$/.test(h);
+
+const getLocalDateYYYYMMDD = (date = new Date()) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const getDateOffsetMonths = (months) => {
+  const date = new Date();
+  date.setHours(0, 0, 0, 0);
+  date.setMonth(date.getMonth() + months);
+  return getLocalDateYYYYMMDD(date);
+};
+
+const getCitaDateWindow = () => ({
+  minDate: getDateOffsetMonths(-2),
+  maxDate: getDateOffsetMonths(3)
+});
+
+const esFechaCitaDentroDeVentana = (fecha) => {
+  if (!esFechaValida(fecha)) return false;
+  const value = String(fecha).slice(0, 10);
+  const { minDate, maxDate } = getCitaDateWindow();
+  return value >= minDate && value <= maxDate;
+};
 const decodificarJwtPayload = (token) => {
   if (!token || typeof token !== 'string') return null;
   const partes = token.split('.');
@@ -53,7 +82,7 @@ const obtenerPerfilIdAutenticado = async (token, supabaseUser) => {
 
 export const crearCitaController = async (req, res) => {
   try {
-    const token = (req.headers.authorization || '').startsWith('Bearer ') ? req.headers.authorization.replace('Bearer ', '').trim() : null;
+    const token = getAuthTokenFromReq(req);
     if (!token) return res.status(401).json({ error: 'Token no proporcionado' });
     const supabaseUser = getSupabaseClientWithToken(token);
 
@@ -77,17 +106,11 @@ export const crearCitaController = async (req, res) => {
       return res.status(400).json({ error: 'id_tratamiento inválido' });
     }
     if (!esFechaValida(fecha)) return res.status(400).json({ error: 'fecha inválida, formato YYYY-MM-DD' });
-    if (!esHoraValida(hora_inicio) || !esHoraValida(hora_fin)) return res.status(400).json({ error: 'hora_inicio/hora_fin inválida, formato HH:MM ó HH:MM:SS' });
-    // Horario de atención: 08:00 – 20:00
-    if (String(hora_inicio) < '08:00' || String(hora_inicio) >= '20:00') return res.status(400).json({ error: 'hora_inicio fuera del horario de atención (08:00 – 20:00)' });
-    if (String(hora_fin) > '20:00' || String(hora_fin) <= '08:00') return res.status(400).json({ error: 'hora_fin fuera del horario de atención (08:00 – 20:00)' });
-    if (String(hora_inicio) >= String(hora_fin)) return res.status(400).json({ error: 'hora_fin debe ser posterior a hora_inicio' });
-    // Duración máxima: 2 horas
-    {
-      const [hi, mi] = String(hora_inicio).split(':').map(Number);
-      const [hf, mf] = String(hora_fin).split(':').map(Number);
-      if ((hf * 60 + mf) - (hi * 60 + mi) > 120) return res.status(400).json({ error: 'La duración máxima de una cita es de 2 horas' });
+    if (!esFechaCitaDentroDeVentana(fecha)) {
+      const { minDate, maxDate } = getCitaDateWindow();
+      return res.status(400).json({ error: `La fecha de la cita debe estar entre ${minDate} y ${maxDate}` });
     }
+    if (!esHoraValida(hora_inicio) || !esHoraValida(hora_fin)) return res.status(400).json({ error: 'hora_inicio/hora_fin inválida, formato HH:MM ó HH:MM:SS' });
     if (estado !== undefined && estado !== null && !estadosPermitidos.includes(String(estado))) return res.status(400).json({ error: `estado inválido. Debe ser: ${estadosPermitidos.join(', ')}` });
 
     // Verificar que paciente, doctor y tratamiento (si aplica) existen — RLS aplica
@@ -120,6 +143,8 @@ export const crearCitaController = async (req, res) => {
       precioCalculado = Number(tratExist.precio || 0);
     }
 
+    const perfil = await getPerfilFromToken(token);
+
     const insertObj = {
       id_paciente: String(id_paciente).trim(),
       id_doctor: Number(id_doctor),
@@ -131,6 +156,12 @@ export const crearCitaController = async (req, res) => {
       precio: typeof precio !== 'undefined' && precio !== null ? precio : (precioCalculado !== null ? precioCalculado : 0),
       estado: estado ? String(estado) : 'agendada'
     };
+    // asignar sede_id: administrador -> su sede; superadmin puede enviar sede_id en body
+    if (perfil && perfil.rol === 'superadmin') {
+      if (req.body && req.body.sede_id) insertObj.sede_id = Number(req.body.sede_id);
+    } else if (perfil && perfil.sede_id) {
+      insertObj.sede_id = perfil.sede_id;
+    }
 
     const { data, error } = await supabaseUser.from('cita').insert([insertObj]).select().maybeSingle();
     if (error) return res.status(400).json({ error: error.message || error });
@@ -212,7 +243,7 @@ export const crearCitaController = async (req, res) => {
 
 export const obtenerCitasController = async (req, res) => {
   try {
-    const token = (req.headers.authorization || '').startsWith('Bearer ') ? req.headers.authorization.replace('Bearer ', '').trim() : null;
+    const token = getAuthTokenFromReq(req);
     if (!token) return res.status(401).json({ error: 'Token no proporcionado' });
     const supabaseUser = getSupabaseClientWithToken(token);
 
@@ -237,6 +268,13 @@ export const obtenerCitasController = async (req, res) => {
       query = query.eq('estado', String(estado));
     }
 
+    // permitir filtrado por sede desde frontend (sedeActiva)
+    const { sede_id: sedeQuery } = req.query || {};
+    if (sedeQuery !== undefined && sedeQuery !== null && String(sedeQuery).trim() !== '') {
+      const sid = Number(sedeQuery);
+      if (!Number.isNaN(sid)) query = query.eq('sede_id', sid);
+    }
+
     const { data, error } = await query.order('fecha', { ascending: false }).order('hora_inicio', { ascending: false });
     if (error) return res.status(500).json({ error: error.message || error });
 
@@ -248,7 +286,7 @@ export const obtenerCitasController = async (req, res) => {
 
 export const obtenerCitaPorIdController = async (req, res) => {
   try {
-    const token = (req.headers.authorization || '').startsWith('Bearer ') ? req.headers.authorization.replace('Bearer ', '').trim() : null;
+    const token = getAuthTokenFromReq(req);
     if (!token) return res.status(401).json({ error: 'Token no proporcionado' });
     const supabaseUser = getSupabaseClientWithToken(token);
 
@@ -271,7 +309,7 @@ export const obtenerCitaPorIdController = async (req, res) => {
 
 export const actualizarCitaController = async (req, res) => {
   try {
-    const token = (req.headers.authorization || '').startsWith('Bearer ') ? req.headers.authorization.replace('Bearer ', '').trim() : null;
+    const token = getAuthTokenFromReq(req);
     if (!token) return res.status(401).json({ error: 'Token no proporcionado' });
     const supabaseUser = getSupabaseClientWithToken(token);
 
@@ -291,6 +329,9 @@ export const actualizarCitaController = async (req, res) => {
     const { data: existing, error: fetchErr } = await supabaseUser.from('cita').select('id, estado, precio, id_doctor, tratamientos, id_perfil').eq('id', Number(id)).maybeSingle();
     if (fetchErr) return res.status(500).json({ error: fetchErr.message || fetchErr });
     if (!existing) return res.status(404).json({ error: 'Cita no encontrada' });
+    if (String(existing.estado || '').toLowerCase() === 'atendida') {
+      return res.status(409).json({ error: 'La cita ya fue atendida y no puede editarse.' });
+    }
 
     const perfilId = await obtenerPerfilIdAutenticado(token, supabaseUser);
 
@@ -309,6 +350,9 @@ export const actualizarCitaController = async (req, res) => {
       if (!esEnteroPositivo(id_doctor)) return res.status(400).json({ error: 'id_doctor inválido' });
       updates.id_doctor = Number(id_doctor);
     }
+    const precioExplicito = precio !== undefined && precio !== null && String(precio).trim() !== '';
+    const precioFinalExplicito = precioExplicito ? Number(precio) : null;
+
     if (tratamientos !== undefined) {
       if (!Array.isArray(tratamientos)) return res.status(400).json({ error: 'tratamientos debe ser un arreglo de IDs' });
       if (tratamientos.length === 0) return res.status(400).json({ error: 'El arreglo tratamientos no puede estar vacío' });
@@ -322,8 +366,11 @@ export const actualizarCitaController = async (req, res) => {
         const faltantes = ids.filter((x) => !encontrados.includes(x));
         return res.status(404).json({ error: `Tratamientos no encontrados: ${faltantes.join(', ')}` });
       }
-      const total = tratamientosData.reduce((s, t) => s + Number(t.precio || 0), 0);
-      updates.precio = total;
+      // Solo calcular automáticamente el monto si el cliente no envía un valor explícito.
+      if (!precioExplicito) {
+        const total = tratamientosData.reduce((s, t) => s + Number(t.precio || 0), 0);
+        updates.precio = total;
+      }
       // Do not write `id_tratamiento` directly on `cita` because some DB
       // schemas do not include that column. Use the `cita_tratamiento`
       // relation table to store treatments (handled below).
@@ -331,33 +378,25 @@ export const actualizarCitaController = async (req, res) => {
     if (id_perfil !== undefined) updates.id_perfil = id_perfil || null;
     if (fecha !== undefined) {
       if (!esFechaValida(fecha)) return res.status(400).json({ error: 'fecha inválida, formato YYYY-MM-DD' });
+      if (!esFechaCitaDentroDeVentana(fecha)) {
+        const { minDate, maxDate } = getCitaDateWindow();
+        return res.status(400).json({ error: `La fecha de la cita debe estar entre ${minDate} y ${maxDate}` });
+      }
       updates.fecha = String(fecha);
     }
     if (hora_inicio !== undefined) {
       if (!esHoraValida(hora_inicio)) return res.status(400).json({ error: 'hora_inicio inválida' });
-      if (String(hora_inicio) < '08:00' || String(hora_inicio) >= '20:00') return res.status(400).json({ error: 'hora_inicio fuera del horario de atención (08:00 – 20:00)' });
       updates.hora_inicio = String(hora_inicio);
     }
     if (hora_fin !== undefined) {
       if (!esHoraValida(hora_fin)) return res.status(400).json({ error: 'hora_fin inválida' });
-      if (String(hora_fin) > '20:00' || String(hora_fin) <= '08:00') return res.status(400).json({ error: 'hora_fin fuera del horario de atención (08:00 – 20:00)' });
       updates.hora_fin = String(hora_fin);
     }
-    // Validar orden y duración máxima usando los valores finales (existentes + actualizados)
-    {
-      const finalInicio = updates.hora_inicio || existing.hora_inicio;
-      const finalFin = updates.hora_fin || existing.hora_fin;
-      if (finalInicio && finalFin) {
-        if (String(finalInicio) >= String(finalFin)) return res.status(400).json({ error: 'hora_fin debe ser posterior a hora_inicio' });
-        const [hi, mi] = String(finalInicio).split(':').map(Number);
-        const [hf, mf] = String(finalFin).split(':').map(Number);
-        if ((hf * 60 + mf) - (hi * 60 + mi) > 120) return res.status(400).json({ error: 'La duración máxima de una cita es de 2 horas' });
-      }
-    }
-    if (precio !== undefined) {
-      const p = Number(precio);
-      if (Number.isNaN(p) || p < 0) return res.status(400).json({ error: 'precio inválido' });
-      updates.precio = p;
+    // El precio explícito del formulario tiene prioridad sobre la sumatoria de tratamientos.
+    // Si no viene precio, entonces se conserva el cálculo automático.
+    if (precioExplicito) {
+      if (Number.isNaN(precioFinalExplicito) || precioFinalExplicito < 0) return res.status(400).json({ error: 'precio inválido' });
+      updates.precio = precioFinalExplicito;
     }
     if (estado !== undefined) {
       if (!estadosPermitidos.includes(String(estado))) return res.status(400).json({ error: `estado inválido. Debe ser: ${estadosPermitidos.join(', ')}` });
@@ -369,9 +408,11 @@ export const actualizarCitaController = async (req, res) => {
     }
 
     // aceptar metodo_pago y detalle_pago (opcionales) y validarlos (no escribimos en `cita`, se usan para el movimiento)
+    let metodoPagoNormCita = undefined;
     if (metodo_pago !== undefined) {
-      const allowed = ['efectivo', 'transferencia', 'tarjeta'];
-      if (!allowed.includes(String(metodo_pago))) return res.status(400).json({ error: `metodo_pago inválido. Debe ser uno de: ${allowed.join(', ')}` });
+      const mpNormTmp = normalizeMetodoPago(metodo_pago);
+      if (mpNormTmp === null) return res.status(400).json({ error: `metodo_pago inválido. Debe ser uno de: efectivo, transferencia, tarjeta, deposito` });
+      metodoPagoNormCita = mpNormTmp;
     }
     if (detalle_pago !== undefined) {
       if (detalle_pago !== null && typeof detalle_pago !== 'string') return res.status(400).json({ error: 'detalle_pago debe ser una cadena' });
@@ -388,16 +429,8 @@ export const actualizarCitaController = async (req, res) => {
       const estadoNuevo = data && data.estado ? String(data.estado) : null;
       if (estadoPrevio !== 'Atendida' && estadoNuevo === 'Atendida' && perfilId) {
         const finClient = supabaseAdmin || supabaseUser;
-          const getLocalDateYYYYMMDD = () => {
-            const d = new Date();
-            const y = d.getFullYear();
-            const m = String(d.getMonth() + 1).padStart(2, '0');
-            const day = String(d.getDate()).padStart(2, '0');
-            return `${y}-${m}-${day}`;
-          };
-          const todayLocal = getLocalDateYYYYMMDD();
-          const utcDate = new Date().toISOString().slice(0, 10);
-          const recentThreshold = new Date(Date.now() - 30000).toISOString(); // 30s
+          // Prefer the cita's date for the movimiento. Use data.fecha when available.
+          const citaFecha = data && data.fecha ? String(data.fecha).slice(0, 10) : (new Date().toISOString().slice(0, 10));
           const { data: movNull, error: movNullErr } = await finClient
             .from('movimiento_finanzas')
             .select('id, descripcion, metodo_pago, created_at')
@@ -405,36 +438,58 @@ export const actualizarCitaController = async (req, res) => {
             .eq('id_doctor', Number(data.id_doctor))
             .eq('tipo', 'ingreso')
             .eq('monto', Number(data.precio || 0))
-            .in('fecha', [todayLocal, utcDate])
-            .gte('created_at', recentThreshold)
+            .eq('fecha', citaFecha)
             .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle();
 
-        if (!movNullErr && movNull && movNull.id) {
-          const updateObj = { id_perfil: perfilId, fecha: todayLocal };
-          // asignar metodo_pago y concatenar detalle si fue enviado en la request
-          if (metodo_pago) updateObj.metodo_pago = String(metodo_pago);
-          if (detalle_pago) {
-            const base = movNull.descripcion || '';
-            updateObj.descripcion = base ? `${base} - ${String(detalle_pago)}` : String(detalle_pago);
-          }
+          if (!movNullErr && movNull && movNull.id) {
+            const updateObj = { id_perfil: perfilId, fecha: citaFecha };
+            if (metodoPagoNormCita) updateObj.metodo_pago = metodoPagoNormCita;
+            if (detalle_pago) {
+              const base = movNull.descripcion || '';
+              updateObj.descripcion = base ? `${base} - ${String(detalle_pago)}` : String(detalle_pago);
+            }
 
-          await finClient.from('movimiento_finanzas').update(updateObj).eq('id', movNull.id);
-        } else {
+            await finClient.from('movimiento_finanzas').update(updateObj).eq('id', movNull.id);
+            // Recalculate caja totals for the cita period
+            try {
+              const parts = String(citaFecha).split('-');
+              const y = Number(parts[0]);
+              const m = Number(parts[1]);
+              if (!Number.isNaN(y) && !Number.isNaN(m) && finClient) await actualizarTotalesCajaParaPeriodo(finClient, data.sede_id || perfil?.sede_id, y, m);
+            } catch (e) {
+              // don't block flow
+            }
+          } else {
           // Si no existe el movimiento creado por el trigger, crear uno explícitamente
-          try {
+            try {
             const createObj = {
               id_perfil: perfilId,
               id_doctor: Number(data.id_doctor),
               tipo: 'ingreso',
               monto: Number(data.precio || 0),
-              metodo_pago: metodo_pago || 'efectivo',
               descripcion: detalle_pago ? String(detalle_pago) : (data.tratamientos ? `consulta de: ${data.tratamientos}` : ''),
-              fecha: todayLocal,
-              created_at: new Date().toISOString()
+              fecha: citaFecha,
+              created_at: new Date(`${citaFecha}T00:00:00`).toISOString()
             };
+              if (metodoPagoNormCita) createObj.metodo_pago = metodoPagoNormCita;
+            // Asignar sede si está disponible en la cita o en el perfil
+            try {
+              const sedeFromData = data && data.sede_id ? data.sede_id : null;
+              if (sedeFromData) createObj.sede_id = sedeFromData;
+              else if (perfil && perfil.sede_id) createObj.sede_id = perfil.sede_id;
+            } catch (e) {}
             await finClient.from('movimiento_finanzas').insert([createObj]);
+            // After creating movement, recalculate caja totals for the cita's month
+            try {
+              const parts2 = String(citaFecha).split('-');
+              const y2 = Number(parts2[0]);
+              const m2 = Number(parts2[1]);
+              if (!Number.isNaN(y2) && !Number.isNaN(m2) && finClient) await actualizarTotalesCajaParaPeriodo(finClient, createObj.sede_id || data.sede_id || perfil?.sede_id, y2, m2);
+            } catch (e) {
+              // ignore
+            }
           } catch (e) {
             // no bloquear flujo principal
           }
@@ -479,7 +534,21 @@ export const actualizarCitaController = async (req, res) => {
       }
     }
 
-    return res.json({ mensaje: 'Cita actualizada', cita: data });
+    // Reaplicar el monto explícito al final por si alguna lógica de BD ajusta la cita
+    // después de sincronizar las relaciones de tratamientos.
+    if (precioExplicito && Number.isFinite(precioFinalExplicito)) {
+      const { error: finalPrecioErr } = await dbClient
+        .from('cita')
+        .update({ precio: precioFinalExplicito })
+        .eq('id', Number(id));
+      if (finalPrecioErr) return res.status(500).json({ error: finalPrecioErr.message || finalPrecioErr });
+    }
+
+    const citaRespuesta = precioExplicito && Number.isFinite(precioFinalExplicito)
+      ? { ...data, precio: precioFinalExplicito }
+      : data;
+
+    return res.json({ mensaje: 'Cita actualizada', cita: citaRespuesta });
   } catch (error) {
     return res.status(500).json({ error: error.message || error });
   }
@@ -487,7 +556,7 @@ export const actualizarCitaController = async (req, res) => {
 
 export const eliminarCitaController = async (req, res) => {
   try {
-    const token = (req.headers.authorization || '').startsWith('Bearer ') ? req.headers.authorization.replace('Bearer ', '').trim() : null;
+    const token = getAuthTokenFromReq(req);
     if (!token) return res.status(401).json({ error: 'Token no proporcionado' });
     const supabaseUser = getSupabaseClientWithToken(token);
 

@@ -41,6 +41,10 @@
   color: #1a1a1a;
 }
 
+.citas-mobile-list {
+  display: none;
+}
+
 .cita-tratamientos-stack {
   display: flex;
   flex-direction: column;
@@ -191,12 +195,119 @@
 
 @media (max-width: 720px) {
   .citas-table {
-    font-size: 0.8rem;
+    display: none;
   }
 
-  .citas-table th,
-  .citas-table td {
-    padding: 0.5rem 0.25rem;
+  .citas-mobile-list {
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .citas-mobile-card {
+    background: #fff;
+    border: 1px solid #e6e0cf;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  }
+
+  .citas-mobile-card__summary {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.65rem;
+    border: none;
+    background: linear-gradient(180deg, #fffdf7 0%, #fff 100%);
+    padding: 0.95rem 1rem;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .citas-mobile-card__toggle {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 999px;
+    background: rgba(216, 163, 26, 0.12);
+    color: #b07c00;
+  }
+
+  .citas-mobile-card__summary-main {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  .citas-mobile-card__patient-label {
+    color: #6b6b6b;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 700;
+  }
+
+  .citas-mobile-card__patient-name {
+    color: #1a1a1a;
+    font-size: 0.98rem;
+    line-height: 1.25;
+  }
+
+  .citas-mobile-card__patient-name strong {
+    display: block;
+    font-weight: 700;
+    word-break: break-word;
+  }
+
+  .citas-mobile-card__summary-actions {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.25rem;
+    margin-left: auto;
+  }
+
+  .citas-mobile-card__details {
+    border-top: 2px solid rgba(34, 51, 84, 0.22);
+    padding: 0.9rem 1rem 1rem;
+    background: #fff;
+    display: grid;
+    gap: 0.6rem;
+  }
+
+  .citas-mobile-card__row {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.2rem;
+    padding-bottom: 0.7rem;
+    margin-bottom: 0.15rem;
+    border-bottom: 2px solid rgba(34, 51, 84, 0.28);
+  }
+
+  .citas-mobile-card__row:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: 0;
+  }
+
+  .citas-mobile-card__label {
+    color: #6b6b6b;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 700;
+  }
+
+  .citas-mobile-card__value {
+    color: #232323;
+    font-size: 0.95rem;
+    word-break: break-word;
   }
 
   .cita-form .form-row {
@@ -210,6 +321,21 @@
   .action-btn {
     width: 20px;
     height: 28px;
+  }
+
+  .table-actions--mobile {
+    padding: 0;
+    gap: 0.35rem;
+  }
+
+  .table-actions--mobile .action-btn {
+    width: 36px;
+    height: 36px;
+  }
+
+  .table-actions--mobile .action-btn svg {
+    width: 18px;
+    height: 18px;
   }
 
   .modal-content {

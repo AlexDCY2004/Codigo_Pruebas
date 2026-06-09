@@ -1,14 +1,10 @@
 import { supabase, supabaseAdmin } from '../configuracionesDB/supabaseClient.js';
-
-const getAuthToken = (req) => {
-    const header = req.headers.authorization || '';
-    if (!header.startsWith('Bearer ')) return null;
-    return header.replace('Bearer ', '').trim();
-};
+import { clearAuthCookies, getAuthTokenFromReq, getRefreshTokenFromReq, setAuthCookies } from '../utils/authUtils.js';
 
 export const loginController = async (req, res) => {
     try {
         const { email, password } = req.body;
+        let returnedRole = null;
 
         if (!email || !password) {
             return res.status(400).json({
@@ -37,16 +33,33 @@ export const loginController = async (req, res) => {
             console.warn('Error leyendo perfil en login:', perfilError.message || perfilError);
         }
 
-        return res.json({
-            access_token: data.session.access_token,
-            refresh_token: data.session.refresh_token,
+        setAuthCookies(res, {
+            accessToken: data.session.access_token,
+            refreshToken: data.session.refresh_token,
+            accessMaxAgeMs: Number(data.session.expires_in || 3600) * 1000
+        });
+
+        returnedRole = perfil?.rol ?? null;
+
+        // En entornos de desarrollo, devolver también los tokens en el cuerpo
+        // como fallback para facilitar el desarrollo local (evita bloquear
+        // el flujo si el entorno de cookies cross-site no está configurado).
+        const resp = {
             usuario: {
                 id: data.user.id,
                 email: data.user.email,
                 nombre: perfil?.nombre || data.user.user_metadata?.nombre || 'Usuario',
-                rol: perfil?.rol ?? null,
+                rol: returnedRole,
+                sede_id: perfil?.sede_id ?? null,
             }
-        });
+        };
+
+        if (process.env.NODE_ENV !== 'production') {
+            resp.accessToken = data.session.access_token;
+            resp.refreshToken = data.session.refresh_token;
+        }
+
+        return res.json(resp);
     } catch (error) {
         return res.status(500).json({ error: error.message });
     }
@@ -55,6 +68,7 @@ export const loginController = async (req, res) => {
 export const registroController = async (req, res) => {
     try {
         const { email, password, nombre } = req.body;
+        let returnedRole = null;
 
         if (!email || !password || !nombre) {
             return res.status(400).json({
@@ -116,7 +130,7 @@ export const registroController = async (req, res) => {
                 id: data.user?.id,
                 email: data.user?.email,
                 nombre: String(nombre).trim(),
-                rol: typeof returnedRole !== 'undefined' ? returnedRole : null
+                rol: returnedRole
             }
         });
     } catch (error) {
@@ -126,7 +140,7 @@ export const registroController = async (req, res) => {
 
 export const obtenerPerfilController = async (req, res) => {
     try {
-        const token = getAuthToken(req);
+        const token = getAuthTokenFromReq(req);
 
         if (!token) {
             return res.status(401).json({ error: 'Token no proporcionado' });
@@ -143,7 +157,7 @@ export const obtenerPerfilController = async (req, res) => {
 
         const { data: perfil, error: perfilError } = await supabaseAdmin
             .from('perfil')
-            .select('id, nombre, rol, created_at')
+            .select('id, nombre, rol, sede_id, created_at')
             .eq('id', user.id)
             .maybeSingle();
 
@@ -156,8 +170,71 @@ export const obtenerPerfilController = async (req, res) => {
             email: user.email,
             nombre: perfil?.nombre || user.user_metadata?.nombre || 'Usuario',
             rol: perfil?.rol ?? null,
+            sede_id: perfil?.sede_id ?? null,
             created_at: perfil?.created_at
         });
+    } catch (error) {
+        return res.status(500).json({ error: error.message });
+    }
+};
+
+export const refreshController = async (req, res) => {
+    try {
+        const refreshToken = getRefreshTokenFromReq(req);
+
+        if (!refreshToken) {
+            return res.status(401).json({ error: 'Refresh token no proporcionado' });
+        }
+
+        const { data, error } = await supabase.auth.refreshSession({ refresh_token: refreshToken });
+        if (error || !data?.session || !data?.user) {
+            clearAuthCookies(res);
+            return res.status(401).json({ error: 'No fue posible renovar la sesión' });
+        }
+
+        const { data: perfil, error: perfilError } = await supabaseAdmin
+            .from('perfil')
+            .select('id, nombre, rol, sede_id, created_at')
+            .eq('id', data.user.id)
+            .maybeSingle();
+
+        if (perfilError) {
+            console.warn('Error leyendo perfil en refresh:', perfilError.message || perfilError);
+        }
+
+        setAuthCookies(res, {
+            accessToken: data.session.access_token,
+            refreshToken: data.session.refresh_token,
+            accessMaxAgeMs: Number(data.session.expires_in || 3600) * 1000
+        });
+
+        const resp = {
+            usuario: {
+                id: data.user.id,
+                email: data.user.email,
+                nombre: perfil?.nombre || data.user.user_metadata?.nombre || 'Usuario',
+                rol: perfil?.rol ?? null,
+                sede_id: perfil?.sede_id ?? null,
+                created_at: perfil?.created_at
+            }
+        };
+
+        if (process.env.NODE_ENV !== 'production') {
+            resp.accessToken = data.session.access_token;
+            resp.refreshToken = data.session.refresh_token;
+        }
+
+        return res.json(resp);
+    } catch (error) {
+        clearAuthCookies(res);
+        return res.status(500).json({ error: error.message });
+    }
+};
+
+export const logoutController = async (_req, res) => {
+    try {
+        clearAuthCookies(res);
+        return res.json({ mensaje: 'Sesión cerrada' });
     } catch (error) {
         return res.status(500).json({ error: error.message });
     }

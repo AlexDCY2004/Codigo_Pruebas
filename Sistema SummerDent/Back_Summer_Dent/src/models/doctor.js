@@ -1,5 +1,6 @@
 import { DataTypes } from 'sequelize';
 import { sequelize } from '../configuracionesDB/database.js';
+import Sede from './sede.js';
 
 const estadosPermitidos = ['disponible', 'no disponible', 'eventual'];
 
@@ -70,6 +71,10 @@ export const Doctor = sequelize.define(
                 }
             }
         },
+        sede_id: {
+            type: DataTypes.INTEGER,
+            allowNull: true
+        },
         created_at: {
             type: DataTypes.DATE,
             allowNull: false,
@@ -84,3 +89,6 @@ export const Doctor = sequelize.define(
 );
 
 export default Doctor;
+
+Doctor.belongsTo(Sede, { foreignKey: 'sede_id', as: 'sede' });
+Sede.hasMany(Doctor, { foreignKey: 'sede_id', as: 'doctores' });

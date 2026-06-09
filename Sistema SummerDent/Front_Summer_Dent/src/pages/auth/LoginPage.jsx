@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import apiClient from '../../services/api/client';
 import { useAuthStore } from '../../store/authStore';
 import logoImage from '../../assets/Logo.png';
-import { sanitizeEmail, validarEmail } from '../../utils/sanitize';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -15,38 +14,22 @@ export default function LoginPage() {
   const [errorMessage, setErrorMessage] = useState('');
 
   const handleChange = (event) => {
-    const { name, value } = event.target;
-
+    const { name, value: rawValue } = event.target;
+    let value = rawValue;
+    // enforce max lengths: usuario/email 32, password 20
     if (name === 'email') {
-      setForm((prev) => ({ ...prev, email: sanitizeEmail(value, 100) }));
-      return;
+      value = String(value || '').slice(0, 32);
     }
-
-    // Password: limitar longitud
     if (name === 'password') {
-      setForm((prev) => ({ ...prev, password: value.slice(0, 128) }));
-      return;
+      value = String(value || '').slice(0, 20);
     }
-
     setForm((prev) => ({ ...prev, [name]: value }));
+    if (errorMessage) setErrorMessage('');
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
     setErrorMessage('');
-
-    // Validar email
-    const emailError = validarEmail(form.email);
-    if (emailError) {
-      setErrorMessage(emailError);
-      return;
-    }
-
-    if (!form.password) {
-      setErrorMessage('La contraseña es obligatoria');
-      return;
-    }
-
     setIsLoading(true);
 
     try {
@@ -56,9 +39,19 @@ export default function LoginPage() {
       });
 
       setSession({
-        token: data?.access_token,
         user: data?.usuario || null
       });
+
+      // Fallback de desarrollo: si el backend devuelve tokens (solo en dev),
+      // aplicarlos como Authorization header para permitir el flujo local
+      // cuando las cookies cross-site no se establezcan correctamente.
+      if (data?.accessToken) {
+        try {
+          apiClient.defaults.headers.common['Authorization'] = `Bearer ${data.accessToken}`;
+        } catch (e) {
+          void e;
+        }
+      }
 
       navigate('/dashboard', { replace: true });
     } catch (error) {
@@ -78,7 +71,7 @@ export default function LoginPage() {
         <div className="login-brand">
           <img src={logoImage} alt="Logo Summer Dent" className="login-logo" />
           <h1>Summer Dent</h1>
-          <p>Sistema de Gestión Dental</p>
+          <p style={{ fontSize: '1rem', fontWeight: 700 }}>Sonríe al sol y brilla todo el año</p>
         </div>
 
         <div className="login-form-grid">

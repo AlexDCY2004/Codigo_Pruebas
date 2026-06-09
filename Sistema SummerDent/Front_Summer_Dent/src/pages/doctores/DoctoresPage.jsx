@@ -1,15 +1,18 @@
-import { useMemo, useState } from 'react';
-import { sanitizeText } from '../../utils/sanitize';
+import { useEffect, useMemo, useState } from 'react';
 import ConfirmModal from '../../components/ui/ConfirmModal';
+import Button from '../../components/ui/Button';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { createDoctor, deleteDoctor, fetchDoctores, updateDoctor } from '../../services/api/doctores';
 import DoctoresTable from '../../components/doctores/DoctoresTable';
 import DoctorModal from '../../components/doctores/DoctorModal';
 import ErrorState from '../../components/feedback/ErrorState';
 
+const DOCTORES_POR_PAGINA = 15;
+
 export default function DoctoresPage() {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedDoctor, setSelectedDoctor] = useState(null);
   const [isViewMode, setIsViewMode] = useState(false);
@@ -46,6 +49,21 @@ export default function DoctoresPage() {
     });
   }, [doctores, searchTerm]);
 
+  const totalPages = Math.max(1, Math.ceil(filteredDoctores.length / DOCTORES_POR_PAGINA));
+
+  const paginatedDoctores = useMemo(() => {
+    const startIndex = (currentPage - 1) * DOCTORES_POR_PAGINA;
+    return filteredDoctores.slice(startIndex, startIndex + DOCTORES_POR_PAGINA);
+  }, [currentPage, filteredDoctores]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    setCurrentPage((page) => Math.min(page, totalPages));
+  }, [totalPages]);
+
   const openCreateModal = () => {
     setSelectedDoctor(null);
     setIsViewMode(false);
@@ -80,7 +98,7 @@ export default function DoctoresPage() {
       const raw = error.response?.data?.error || String(error.message || 'Error');
       let friendly = 'No se pudo eliminar el odontólogo.';
       if (raw.toLowerCase().includes('violates foreign key') || raw.toLowerCase().includes('foreign key constraint')) {
-        friendly = 'No se puede eliminar el odontólogo porque está en uso en otras entidades.';
+        friendly = 'No se puede eliminar este odontólogo porque tiene citas agendadas.';
       }
       setConfirmError(friendly);
     } finally {
@@ -150,27 +168,56 @@ export default function DoctoresPage() {
         </button>
       </div>
 
-      <div className="search-container">
-        <svg className="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <circle cx="11" cy="11" r="8" />
-          <path d="m21 21-4.35-4.35" />
-        </svg>
-        <input
-          type="text"
-          className="search-input"
-          placeholder="Buscar por nombre, teléfono, correo o especialidad..."
-          value={searchTerm}
-          onChange={(event) => setSearchTerm(sanitizeText(event.target.value, 100))}
-        />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+        <label style={{ fontWeight: 700, fontSize: '0.85rem' }}>Búsqueda</label>
+        <div className="search-container">
+          <svg className="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="11" cy="11" r="8" />
+            <path d="m21 21-4.35-4.35" />
+          </svg>
+          <input
+            type="text"
+            className="search-input"
+            placeholder="Buscar por nombre, teléfono, correo o especialidad..."
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+          />
+        </div>
       </div>
 
       <DoctoresTable
-        doctores={filteredDoctores}
+        doctores={paginatedDoctores}
         isLoading={isLoading}
         onView={handleViewDoctor}
         onEdit={openEditModal}
         onDelete={handleDeleteDoctor}
       />
+
+      {!isLoading && filteredDoctores.length > 0 && (
+        <div className="finance-pagination">
+          <div className="finance-pagination__info">
+            Mostrando {Math.min(filteredDoctores.length, (currentPage - 1) * DOCTORES_POR_PAGINA + 1)}-
+            {Math.min(filteredDoctores.length, currentPage * DOCTORES_POR_PAGINA)} de {filteredDoctores.length}
+          </div>
+          <div className="finance-pagination__controls">
+            <Button
+              variant="secondary"
+              onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+              disabled={currentPage <= 1}
+            >
+              Anterior
+            </Button>
+            <span className="finance-pagination__page">Página {currentPage} de {totalPages}</span>
+            <Button
+              variant="secondary"
+              onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+              disabled={currentPage >= totalPages}
+            >
+              Siguiente
+            </Button>
+          </div>
+        </div>
+      )}
 
       <DoctorModal
         isOpen={isModalOpen}

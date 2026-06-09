@@ -1,4 +1,5 @@
 import apiClient from './client';
+import { useAuthStore } from '../../store/authStore';
 
 const getToday = () => {
   const d = new Date();
@@ -42,11 +43,15 @@ export async function fetchDashboardSnapshot(opts = {}) {
     return `?${params.toString()}`;
   };
 
+  const sedeActiva = useAuthStore.getState().sedeActiva;
+  const params = {};
+  if (sedeActiva !== null && typeof sedeActiva !== 'undefined') params.sede_id = sedeActiva;
+
   const [citasRes, ingresosRes, egresosRes, pacientesRes] = await Promise.allSettled([
-    apiClient.get('/api/citas'),
-    apiClient.get(`/api/movimientos-finanzas${qs('ingreso')}`),
-    apiClient.get(`/api/movimientos-finanzas${qs('egreso')}`),
-    apiClient.get('/api/pacientes')
+    apiClient.get('/api/citas', { params }),
+    apiClient.get(`/api/movimientos-finanzas${qs('ingreso')}`, { params }),
+    apiClient.get(`/api/movimientos-finanzas${qs('egreso')}`, { params }),
+    apiClient.get('/api/pacientes', { params })
   ]);
 
   const citas = citasRes.status === 'fulfilled' && Array.isArray(citasRes.value?.data) ? citasRes.value.data : [];

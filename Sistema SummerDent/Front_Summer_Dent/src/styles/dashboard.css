@@ -7,7 +7,149 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
 }
+
+.dashboard-controls {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.segmented-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* Segmented mode buttons */
+.seg-btn {
+  border: 1px solid rgba(34, 51, 84, 0.08);
+  background: transparent;
+  color: #23324a;
+  padding: 0.45rem 0.85rem;
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 180ms ease;
+}
+
+/* Make selects styled like segmented buttons when using the seg-btn class */
+select.seg-btn {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  display: inline-block;
+  min-width: 160px;
+  text-align: center;
+  padding: 0.45rem 0.85rem;
+  line-height: 1.2;
+  color: #162b49; /* default text color: dark */
+  background: #fff; /* default background for closed select */
+  border: 1px solid rgba(34, 51, 84, 0.08);
+  border-radius: 10px;
+}
+
+select.seg-btn option {
+  font-weight: 600;
+  text-align: center;
+  color: #162b49; /* ensure dropdown options show dark text */
+  background: #fff;
+}
+
+select.seg-btn option:checked,
+select.seg-btn option:checked:focus {
+  color: #fff;
+  background: #2e66d6;
+}
+
+/* active variant for when we want the select to look like the blue segmented button */
+select.seg-btn.is-active,
+.seg-btn--sede.is-active {
+  background: linear-gradient(180deg,#3a7ce5 0%,#2e66d6 100%);
+  color: #fff;
+  box-shadow: 0 6px 18px rgba(16,24,40,0.08);
+}
+
+/* hide default arrow on most browsers and allow custom spacing */
+select.seg-btn::-ms-expand { display: none; }
+
+.seg-btn:not(.is-active):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 1px 4px rgba(16,24,40,0.04);
+}
+
+.seg-btn.is-active {
+  color: #fff;
+  box-shadow: 0 6px 18px rgba(16,24,40,0.08);
+}
+
+.seg-btn--hoy.is-active { background: linear-gradient(180deg,#3a7ce5 0%,#2e66d6 100%); }
+.seg-btn--rango.is-active { background: linear-gradient(180deg,#3a7ce5 0%,#2e66d6 100%); }
+.seg-btn--acumulado.is-active { background: linear-gradient(180deg,#3a7ce5 0%,#2e66d6 100%); }
+
+.dashboard-range-picker {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.75rem;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid rgba(34, 51, 84, 0.12);
+  border-radius: 14px;
+  background: linear-gradient(180deg, #ffffff 0%, #f5f8ff 100%);
+  box-shadow: 0 8px 22px rgba(16, 24, 40, 0.06);
+}
+
+.dashboard-range-field {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 160px;
+}
+
+.dashboard-range-field span {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #53657f;
+  letter-spacing: 0.02em;
+}
+
+.dashboard-date-input {
+  appearance: none;
+  border: 1px solid rgba(58, 124, 229, 0.24);
+  border-radius: 12px;
+  background: #fff;
+  color: #162b49;
+  padding: 0.62rem 0.8rem;
+  font: inherit;
+  font-weight: 600;
+  min-height: 42px;
+  min-width: 150px;
+  box-shadow: inset 0 1px 2px rgba(16, 24, 40, 0.04);
+  transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+.dashboard-date-input:hover {
+  border-color: rgba(58, 124, 229, 0.42);
+}
+
+.dashboard-date-input:focus {
+  outline: none;
+  border-color: #3a7ce5;
+  box-shadow: 0 0 0 4px rgba(58, 124, 229, 0.14);
+}
+
+.dashboard-date-input::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.8;
+}
+
+.dashboard-date-input::-moz-focus-inner {
+  border: 0;
+}
+
+/* Slight tint for stat cards depending on selected mode */
+.mode-hoy .stat-card { background: linear-gradient(180deg,#f4f8ff 0%, #f8fbff 100%); border-color: rgba(47,115,232,0.12); }
+.mode-rango .stat-card { background: linear-gradient(180deg,#f4f8ff 0%, #f8fbff 100%); border-color: rgba(47,115,232,0.12); }
+.mode-acumulado .stat-card { background: linear-gradient(180deg,#f4f8ff 0%, #f8fbff 100%); border-color: rgba(47,115,232,0.12); }
 
 .dashboard-title h1 {
   margin: 0;
@@ -25,14 +167,114 @@
 .summary-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 1rem;
+  gap: 0.8rem;
+}
+
+.caja-full {
+  width: 100%;
+}
+
+.caja-full__card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: stretch;
+}
+
+
+.caja-full__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.caja-full__selector-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+.caja-full__body {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  width: 100%;
+  justify-content: space-between;
+}
+
+.caja-full__totalBlock {
+  min-width: 240px;
+}
+
+.caja-full__stats {
+  display: flex;
+  gap: 80px; /* more generous spacing between indicators */
+  align-items: center; /* center labels and amounts vertically */
+  justify-content: center; /* center the group horizontally */
+  flex: 1 1 auto;
+}
+
+.caja-full__stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center; /* center contents inside each stat */
+  text-align: center;
+  min-width: 160px; /* ensure each stat occupies space */
+  padding: 0 6px;
+}
+
+
+.caja-full__actions .stat-card__small-btn {
+  border-color: #000000;
+}
+
+.caja-full__actions .stat-card__small-btn:hover,
+.caja-full__actions .stat-card__small-btn:focus-visible {
+  border-color: #000000;
+}
+.caja-full__label {
+  font-size: 12px;
+  color: #53657f;
+  font-weight: 700;
+}
+
+.caja-full__amount {
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.caja-full__amount--positive { color: #1ca655; }
+.caja-full__amount--negative { color: #e11616; }
+
+.caja-full__aside {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  flex: 0 0 160px;
+}
+
+/* Make sure the main content wraps nicely on small screens */
+@media (max-width: 900px) {
+  .caja-full__card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .caja-full__aside { flex: 0 0 auto; width: 100%; align-items: flex-start; }
+  .caja-full__main { gap: 12px; }
+  .caja-full__stats { gap: 36px; }
 }
 
 .stat-card {
   border: 1px solid #777777;
   border-radius: 14px;
   background: #f8fafd;
-  padding: 1.3rem 1.4rem;
+  padding: 0.95rem 1rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -53,11 +295,47 @@
 }
 
 .stat-card__icon {
-  width: 58px;
-  height: 58px;
-  border-radius: 12px;
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
   display: grid;
   place-items: center;
+}
+
+.stat-card--clickable .stat-card__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  align-items: flex-start;
+}
+
+.stat-card__month {
+  font-size: 0.82rem;
+  color: #53657f;
+  font-weight: 700;
+}
+
+.stat-card__small-btn {
+  background: transparent;
+  border: 1px solid rgba(34,51,84,0.08);
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.stat-card__actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.stat-card__small-input {
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(34,51,84,0.08);
+  min-width: 110px;
+  font-weight: 700;
 }
 
 .stat-card__icon--citas-hoy {
@@ -91,12 +369,18 @@
 
 .quick-btn {
   border: none;
-  border-radius: 10px;
-  height: 44px;
+  border-radius: 12px;
+  height: 52px;
   color: #fff;
   font-weight: 700;
-  font-size: 0.85rem;/**/
+  font-size: 0.95rem;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.8rem;
+  padding-left: 1rem;
+  padding-right: 1rem;
 }
 
 .quick-btn--1 {
@@ -115,6 +399,20 @@
   background: #ff6a00;
 }
 
+.quick-btn__icon {
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  align-items: center;
+  justify-content: center;
+}
+
+.quick-btn__label {
+  flex: 1 1 auto;
+  text-align: center;
+}
+
 .dashboard-panels {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -128,16 +426,49 @@
   background: #fbfcfe;
 }
 
+.panel-card__header--appointments {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.panel-card__header--appointments h3 {
+  flex: 0 0 auto;
+}
+
+.panel-card__header--appointments .dashboard-appointments-segmented {
+  margin-top: 0;
+  margin-left: auto;
+  justify-content: flex-end;
+}
+
 .panel-card h3 {
   margin: 0;
   color: #162b49;
   font-size: 1.3rem;/**/
 }
 
+.dashboard-panels > .panel-card > h3 {
+  padding-bottom: 0.65rem;
+  margin-bottom: 0.9rem;
+  border-bottom: 2px solid rgba(34, 51, 84, 0.28);
+}
+
+.panel-card__header--appointments {
+  padding-bottom: 0.65rem;
+  margin-bottom: 0.9rem;
+  border-bottom: 2px solid rgba(34, 51, 84, 0.28);
+}
+
 .appointments-list {
-  margin-top: 1rem;
+  margin-top: 0;
   display: grid;
   gap: 0.8rem;
+}
+
+.dashboard-appointments-segmented {
+  margin-top: 0;
 }
 
 .dashboard-empty {
@@ -254,7 +585,232 @@
 
   .summary-grid,
   .quick-access__buttons {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-range-picker {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .dashboard-range-field,
+  .dashboard-date-input {
+    min-width: 0;
+    width: 100%;
+  }
+
+  /* When the dashboard is in 'rango' mode, keep the date fields in one row */
+  .mode-rango .dashboard-range-picker {
+    flex-direction: row;
+    align-items: flex-end;
+    gap: 0.75rem;
+  }
+
+  .mode-rango .dashboard-range-field {
+    width: 50%;
+    min-width: 0;
+  }
+
+  /* Stack the topbar controls under the title on small screens */
+  .dashboard-topbar {
+    align-items: flex-start;
+  }
+
+  .caja-full__card {
+    padding: 0.85rem 0.9rem;
+    gap: 0.85rem;
+  }
+
+  .caja-full__header {
+    margin-bottom: 0;
+  }
+
+  .caja-full__selector-row {
+    flex-wrap: wrap;
+    gap: 0.55rem;
+    margin-bottom: 0.25rem;
+    padding-bottom: 0.55rem;
+    border-bottom: 2px solid rgba(47, 70, 102, 0.22);
+  }
+
+  .caja-full__selector-row .stat-card__month-select {
+    flex: 1 1 180px;
+    width: 100%;
+    min-width: 0;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.55rem 2.35rem 0.55rem 0.85rem;
+    border: 1px solid rgba(58, 124, 229, 0.18);
+    border-radius: 12px;
+    background: #ffffff url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%232f4666' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>") no-repeat right 0.8rem center/1rem 1rem;
+    color: #1d3354;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+    font-weight: 700;
+    font-size: inherit;
+    cursor: pointer;
+  }
+
+  .caja-full__selector-row .stat-card__month-select:focus {
+    outline: none;
+    border-color: #3a7ce5;
+    box-shadow: 0 0 0 3px rgba(58, 124, 229, 0.12);
+  }
+
+  .caja-full__selector-row .stat-card__month-select option {
+    color: #162b49;
+    background: #ffffff;
+    font-weight: 400;
+    font-size: 0.78rem;
+  }
+
+  .caja-full__selector-row > span {
+    margin-left: 0 !important;
+  }
+
+  .caja-full__body {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.9rem;
+  }
+
+  .caja-full__totalBlock {
+    min-width: 0;
+    width: 100%;
+    padding-bottom: 0.85rem;
+    margin-bottom: 0.15rem;
+    border-bottom: 2px solid rgba(47, 70, 102, 0.22);
+  }
+
+  .caja-full__totalBlock > div:last-child {
+    width: 100%;
+    justify-content: space-between;
+    flex-wrap: wrap;
+  }
+
+  .caja-full__stats {
+    width: 100%;
+    flex-direction: column;
+    gap: 0.65rem;
+    align-items: stretch;
+    justify-content: flex-start;
+  }
+
+  .caja-full__stat {
+    width: 100%;
+    min-width: 0;
+    align-items: flex-start;
+    text-align: left;
+    padding: 0;
+    padding-bottom: 0.8rem;
+    margin-bottom: 0.2rem;
+    border-bottom: 2px solid rgba(47, 70, 102, 0.22);
+  }
+
+  .caja-full__stat:last-child {
+    margin-bottom: 0;
+    border-bottom: 0;
+    padding-bottom: 0;
+  }
+
+  .caja-full__amount {
+    font-size: 1.4rem;
+  }
+
+  .caja-full__actions {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+  }
+
+  .dashboard-title {
+    width: 100%;
+  }
+
+  .panel-card__header--appointments {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .panel-card__header--appointments .dashboard-appointments-segmented {
+    width: 100%;
+    margin-left: 0;
+    justify-content: stretch;
+  }
+
+  .panel-card__header--appointments .dashboard-appointments-segmented .seg-btn {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .panel-card__header--appointments .dashboard-appointments-segmented .seg-btn:nth-child(1),
+  .panel-card__header--appointments .dashboard-appointments-segmented .seg-btn:nth-child(2) {
+    flex: 0 0 28%;
+    max-width: 28%;
+  }
+
+  .panel-card__header--appointments .dashboard-appointments-segmented .seg-btn:nth-child(3) {
+    flex: 1 1 0;
+    max-width: none;
+  }
+
+  .dashboard-controls {
+    margin-left: 0;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+
+  .caja-full__card {
+    padding: 0.8rem 0.8rem;
+  }
+
+  .caja-full__selector-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .caja-full__selector-row .stat-card__month-select,
+  .caja-full__selector-row > span {
+    width: 100%;
+  }
+
+  .caja-full__totalBlock > div:last-child {
+    align-items: center;
+  }
+
+  .caja-full__amount {
+    font-size: 1.25rem;
+  }
+    gap: 0.8rem;
+    margin-top: 0.8rem;
+  }
+
+  .segmented-buttons {
+    width: 100%;
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  /* Make each segmented button share available space equally on small screens */
+  .segmented-buttons .seg-btn {
+    flex: 1 1 0;
+    min-width: 0;
+    text-align: center;
+    padding-left: 0.6rem;
+    padding-right: 0.6rem;
+  }
+
+  /* Ensure title has space below it on small screens */
+  .dashboard-title {
+    margin-bottom: 0.5rem;
   }
 
   .stat-card__value {
@@ -264,5 +820,12 @@
   .appointment-item {
     flex-direction: column;
     align-items: flex-start;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Ensure each stat card takes full width on very small screens */
+  .summary-grid {
+    grid-template-columns: 1fr !important;
   }
 }
