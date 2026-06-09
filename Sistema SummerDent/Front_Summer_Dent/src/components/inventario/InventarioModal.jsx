@@ -1,5 +1,14 @@
-import { useMemo, useState } from 'react';
-import { sanitizeText, sanitizeDecimal, sanitizeDigits } from '../../utils/sanitize';
+import { useState } from 'react';
+
+// Nombre permite letras (incluyendo acentuadas), números, espacios, guión, guión bajo y slash
+const nombreRegex = new RegExp("^[A-Za-z0-9\\u00C0-\\u017F\\s\\-_/]+$");
+
+const ReadRow = ({ label, value }) => (
+  <div className="finance-read-row">
+    <div className="finance-read-label">{label}</div>
+    <div className="finance-read-value">{value || '-'}</div>
+  </div>
+);
 
 export default function InventarioModal({
   isOpen,
@@ -7,29 +16,15 @@ export default function InventarioModal({
   onSubmit,
   initialData,
   isLoading,
-  productos = [],
   readOnly = false
 }) {
   const [errors, setErrors] = useState({});
 
   const isEditing = Boolean(initialData?.id);
 
-  const productOptions = useMemo(() => productos, [productos]);
-
   const formKey = isEditing
     ? `inventario-edit-${initialData.id}-${initialData.id_producto ?? 'sin-producto'}-${initialData.stock_producto ?? 'sin-stock'}-${initialData.stock_minimo ?? 'sin-minimo'}`
     : 'inventario-new';
-
-  const formatDate = (value) => {
-    if (!value) return '-';
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return '-';
-    return date.toLocaleDateString('es-EC', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit'
-    });
-  };
 
   const formatCurrency = (value) => {
     if (value === undefined || value === null || value === '') return '-';
@@ -41,12 +36,6 @@ export default function InventarioModal({
     }).format(amount);
   };
 
-  const ReadRow = ({ label, value }) => (
-    <div className="finance-read-row">
-      <div className="finance-read-label">{label}</div>
-      <div className="finance-read-value">{value || '-'}</div>
-    </div>
-  );
 
   const closeModal = () => {
     setErrors({});
@@ -61,10 +50,22 @@ export default function InventarioModal({
     const stockMinimo = formValues.stock_minimo?.trim() || '';
     const registrarMovimiento = Boolean(formValues.registrarMovimiento);
     const cantidad = formValues.cantidad?.trim() || '';
+    const descripcion = formValues.descripcion?.trim() || '';
+    const categoria = formValues.categoria?.trim() || '';
+    const precio = formValues.precio !== undefined && formValues.precio !== null ? String(formValues.precio).trim() : '';
 
     if (!idProducto) {
       // if no product selected, nombre is required to create a new product
       if (!nombre) nextErrors.nombre = 'Debes ingresar el nombre del producto';
+      else if (!nombreRegex.test(nombre)) nextErrors.nombre = 'El nombre contiene caracteres no permitidos';
+
+      if (!descripcion) nextErrors.descripcion = 'La descripción es obligatoria';
+      if (!categoria) nextErrors.categoria = 'La categoría es obligatoria';
+      if (!precio) nextErrors.precio = 'El precio es obligatorio';
+      else if (!/^\d+(?:\.\d{1,2})?$/.test(precio)) nextErrors.precio = 'Formato de precio inválido';
+    } else {
+      // If editing, still validate name characters if provided
+      if (nombre && !nombreRegex.test(nombre)) nextErrors.nombre = 'El nombre contiene caracteres no permitidos';
     }
 
     if (!stockProducto && !isEditing) {
@@ -92,33 +93,7 @@ export default function InventarioModal({
   };
 
   const handleChange = (event) => {
-    const { name, value } = event.target;
-
-    let sanitized = value;
-    switch (name) {
-      case 'nombre':
-        sanitized = sanitizeText(value, 100);
-        break;
-      case 'descripcion':
-        sanitized = sanitizeText(value, 300);
-        break;
-      case 'categoria':
-        sanitized = sanitizeText(value, 100);
-        break;
-      case 'precio':
-        sanitized = sanitizeDecimal(value);
-        break;
-      case 'stock_producto':
-      case 'stock_minimo':
-      case 'cantidad':
-        sanitized = sanitizeDigits(value, 6);
-        break;
-      default:
-        break;
-    }
-
-    // For uncontrolled inputs using defaultValue, we need to update the DOM directly
-    event.target.value = sanitized;
+    const { name } = event.target;
 
     if (errors[name]) {
       setErrors((prev) => ({
@@ -182,104 +157,113 @@ export default function InventarioModal({
             </div>
           </div>
         ) : (
-        <form key={formKey} className="inventario-form" onSubmit={handleSubmit}>
-          {/* Do not show a product selector. When editing include a hidden id field so submit sends id_producto */}
-          {isEditing && (
-            <input type="hidden" name="id_producto" defaultValue={initialData?.id_producto ? String(initialData.id_producto) : ''} />
-          )}
+          <form key={formKey} className="inventario-form" onSubmit={handleSubmit}>
+            {/* Do not show a product selector. When editing include a hidden id field so submit sends id_producto */}
+            {isEditing && (
+              <input type="hidden" name="id_producto" defaultValue={initialData?.id_producto ? String(initialData.id_producto) : ''} />
+            )}
 
-          {/* Product fields: show for both create and edit; when editing prefill from initialData */}
-          <div className="new-product-fields">
-            <div className="form-group">
-              <label htmlFor="nombre">Nombre del producto *</label>
-              <input
-                id="nombre"
-                name="nombre"
-                type="text"
-                defaultValue={initialData?.producto?.nombre ?? initialData?.nombre ?? ''}
-                onChange={handleChange}
-                className={errors.nombre ? 'input-error' : ''}
-              />
-              {errors.nombre && <span className="error-text">{errors.nombre}</span>}
+            {/* Product fields: show for both create and edit; when editing prefill from initialData */}
+            <div className="new-product-fields">
+              <div className="form-group">
+                <label htmlFor="nombre">Nombre del producto *</label>
+                <input
+                  id="nombre"
+                  name="nombre"
+                  type="text"
+                  defaultValue={initialData?.producto?.nombre ?? initialData?.nombre ?? ''}
+                  onChange={handleChange}
+                  className={errors.nombre ? 'input-error' : ''}
+                />
+                {errors.nombre && <span className="error-text">{errors.nombre}</span>}
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="descripcion">Descripción</label>
+                <input
+                  id="descripcion"
+                  name="descripcion"
+                  type="text"
+                  defaultValue={initialData?.producto?.descripcion ?? initialData?.descripcion ?? ''}
+                  onChange={handleChange}
+                  required
+                  className={errors.descripcion ? 'input-error' : ''}
+                />
+                {errors.descripcion && <span className="error-text">{errors.descripcion}</span>}
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="categoria">Categoría</label>
+                <input
+                  id="categoria"
+                  name="categoria"
+                  type="text"
+                  defaultValue={initialData?.producto?.categoria ?? initialData?.categoria ?? ''}
+                  onChange={handleChange}
+                  required
+                  className={errors.categoria ? 'input-error' : ''}
+                />
+                {errors.categoria && <span className="error-text">{errors.categoria}</span>}
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="precio">Precio</label>
+                <input
+                  id="precio"
+                  name="precio"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  defaultValue={initialData?.precio !== undefined && initialData.precio !== null ? String(initialData.precio) : (initialData?.producto?.precio !== undefined && initialData.producto.precio !== null ? String(initialData.producto.precio) : '')}
+                  onChange={handleChange}
+                  required
+                  className={errors.precio ? 'input-error' : ''}
+                />
+                {errors.precio && <span className="error-text">{errors.precio}</span>}
+              </div>
             </div>
 
-            <div className="form-group">
-              <label htmlFor="descripcion">Descripción</label>
-              <input
-                id="descripcion"
-                name="descripcion"
-                type="text"
-                defaultValue={initialData?.producto?.descripcion ?? initialData?.descripcion ?? ''}
-                onChange={handleChange}
-              />
+            <div className="form-row">
+              <div className="form-group">
+                <label htmlFor="stock_producto">Cantidad Actual *</label>
+                <input
+                  id="stock_producto"
+                  name="stock_producto"
+                  type="number"
+                  min="0"
+                  defaultValue={initialData?.stock_producto !== undefined ? String(initialData.stock_producto) : ''}
+                  onChange={handleChange}
+                  className={errors.stock_producto ? 'input-error' : ''}
+                  placeholder="0"
+                />
+                {errors.stock_producto && <span className="error-text">{errors.stock_producto}</span>}
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="stock_minimo">Stock Mínimo *</label>
+                <input
+                  id="stock_minimo"
+                  name="stock_minimo"
+                  type="number"
+                  min="0"
+                  defaultValue={initialData?.stock_minimo !== undefined ? String(initialData.stock_minimo) : ''}
+                  onChange={handleChange}
+                  className={errors.stock_minimo ? 'input-error' : ''}
+                  placeholder="0"
+                />
+                {errors.stock_minimo && <span className="error-text">{errors.stock_minimo}</span>}
+              </div>
             </div>
 
-            <div className="form-group">
-              <label htmlFor="categoria">Categoría</label>
-              <input
-                id="categoria"
-                name="categoria"
-                type="text"
-                defaultValue={initialData?.producto?.categoria ?? initialData?.categoria ?? ''}
-                onChange={handleChange}
-              />
+            {/* Movement UI removed per request */}
+
+            <div className="modal-footer">
+              <button type="button" className="btn btn-secondary btn-modal-cancel" onClick={closeModal}>Cancelar</button>
+              <button type="submit" className="btn btn-primary btn-modal-save" disabled={isLoading}>
+                {isLoading ? 'Guardando...' : 'Guardar'}
+              </button>
             </div>
-
-            <div className="form-group">
-              <label htmlFor="precio">Precio</label>
-              <input
-                id="precio"
-                name="precio"
-                type="number"
-                step="0.01"
-                min="0"
-                defaultValue={initialData?.precio !== undefined && initialData.precio !== null ? String(initialData.precio) : (initialData?.producto?.precio !== undefined && initialData.producto.precio !== null ? String(initialData.producto.precio) : '')}
-                onChange={handleChange}
-              />
-            </div>
-          </div>
-
-          <div className="form-row">
-            <div className="form-group">
-              <label htmlFor="stock_producto">Cantidad Actual *</label>
-              <input
-                id="stock_producto"
-                name="stock_producto"
-                type="number"
-                min="0"
-                defaultValue={initialData?.stock_producto !== undefined ? String(initialData.stock_producto) : ''}
-                onChange={handleChange}
-                className={errors.stock_producto ? 'input-error' : ''}
-                placeholder="0"
-              />
-              {errors.stock_producto && <span className="error-text">{errors.stock_producto}</span>}
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="stock_minimo">Stock Mínimo *</label>
-              <input
-                id="stock_minimo"
-                name="stock_minimo"
-                type="number"
-                min="0"
-                defaultValue={initialData?.stock_minimo !== undefined ? String(initialData.stock_minimo) : ''}
-                onChange={handleChange}
-                className={errors.stock_minimo ? 'input-error' : ''}
-                placeholder="0"
-              />
-              {errors.stock_minimo && <span className="error-text">{errors.stock_minimo}</span>}
-            </div>
-          </div>
-
-          {/* Movement UI removed per request */}
-
-          <div className="modal-footer">
-            <button type="button" className="btn btn-secondary btn-modal-cancel" onClick={closeModal}>Cancelar</button>
-            <button type="submit" className="btn btn-primary btn-modal-save" disabled={isLoading}>
-              {isLoading ? 'Guardando...' : 'Guardar'}
-            </button>
-          </div>
-        </form>
+          </form>
         )}
       </div>
     </div>

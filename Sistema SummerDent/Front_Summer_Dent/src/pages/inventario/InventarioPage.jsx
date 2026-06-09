@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-import { sanitizeText, sanitizeDigits } from '../../utils/sanitize';
 import ConfirmModal from '../../components/ui/ConfirmModal';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchProductos, updateProducto, createProducto } from '../../services/api/productos';
@@ -39,6 +38,14 @@ const formatCurrency = (value) => {
   // normalize to 2 decimals to avoid floating point artifacts (e.g. 19.9999999)
   const num = Math.round(raw * 100) / 100;
   return new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD' }).format(num);
+};
+
+const getLocalDateYYYYMMDD = () => {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 };
 
 /*const toDateInputValue = (value) => {
@@ -206,7 +213,7 @@ export default function InventarioPage() {
         if (movementDetallePago) payload.detalle_pago = movementDetallePago;
       }
 
-      await registrarMovimientoInventario(payload);
+      await registrarMovimientoInventario({ ...payload, fecha: getLocalDateYYYYMMDD() });
       // After movement, refresh cache from server so DB timestamps are authoritative
       queryClient.invalidateQueries({ queryKey: ['inventario'] });
       setMovementConfirmOpen(false);
@@ -249,7 +256,8 @@ export default function InventarioPage() {
           await registrarMovimientoInventario({
             id_producto: createdProductId,
             tipo_movimiento: payload.tipo_movimiento,
-            cantidad: payload.cantidad
+            cantidad: payload.cantidad,
+            fecha: getLocalDateYYYYMMDD()
           });
         }
       } else {
@@ -270,13 +278,14 @@ export default function InventarioPage() {
         };
         console.log('Updating product', productId, updatePayload);
         await updateProducto(productId, updatePayload);
-        
+
 
         if (payload.registrarMovimiento) {
           await registrarMovimientoInventario({
             id_producto: productId,
             tipo_movimiento: payload.tipo_movimiento,
-            cantidad: payload.cantidad
+            cantidad: payload.cantidad,
+            fecha: getLocalDateYYYYMMDD()
           });
         }
       }
@@ -340,7 +349,7 @@ export default function InventarioPage() {
             className="search-input"
             placeholder="Buscar por producto, stock o perfil..."
             value={searchTerm}
-            onChange={(event) => setSearchTerm(sanitizeText(event.target.value, 100))}
+            onChange={(event) => setSearchTerm(event.target.value)}
           />
         </div>
 
@@ -510,7 +519,7 @@ export default function InventarioPage() {
               type="number"
               min="1"
               value={pendingMovementQty}
-              onChange={(e) => setPendingMovementQty(sanitizeDigits(e.target.value, 6))}
+              onChange={(e) => setPendingMovementQty(e.target.value)}
               style={{ width: '6rem', padding: '0.25rem' }}
             />
           </label>
@@ -539,7 +548,7 @@ export default function InventarioPage() {
 
                 <div className="form-group">
                   <label htmlFor="mov_detalle_pago">Detalle</label>
-                  <textarea id="mov_detalle_pago" rows={3} value={movementDetallePago} onChange={(e) => setMovementDetallePago(sanitizeText(e.target.value, 300))} placeholder="Descripción breve del pago (opcional)" style={{ width: '100%', padding: '0.5rem' }} maxLength={300} />
+                  <textarea id="mov_detalle_pago" rows={3} value={movementDetallePago} onChange={(e) => setMovementDetallePago(e.target.value)} placeholder="Descripción breve del pago (opcional)" style={{ width: '100%', padding: '0.5rem' }} />
                 </div>
               </div>
             </div>
