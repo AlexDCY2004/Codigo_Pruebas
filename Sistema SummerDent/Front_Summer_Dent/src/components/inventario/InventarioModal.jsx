@@ -2,46 +2,6 @@ import { useState } from 'react';
 
 // Nombre permite letras (incluyendo acentuadas), números, espacios, guión, guión bajo y slash
 const nombreRegex = new RegExp("^[A-Za-z0-9\\u00C0-\\u017F\\s\\-_/]+$");
-const categoriaRegex = new RegExp("^[A-Za-z\\u00C0-\\u017F\\s]+$");
-
-const getTodayInputDate = () => {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-};
-
-const getMaxInputDate = () => {
-  const d = new Date();
-  d.setFullYear(d.getFullYear() + 5);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-};
-
-const formatDate = (value) => {
-  if (!value) return '-';
-  const raw = String(value).split('T')[0];
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return '-';
-  const [year, month, day] = raw.split('-').map(Number);
-  const date = new Date(year, month - 1, day);
-  if (Number.isNaN(date.getTime())) return '-';
-  return date.toLocaleDateString('es-EC', { year: 'numeric', month: '2-digit', day: '2-digit' });
-};
-
-const toInputDate = (value) => {
-  if (!value) return '';
-  const raw = String(value).split('T')[0];
-  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-};
 
 const ReadRow = ({ label, value }) => (
   <div className="finance-read-row">
@@ -94,30 +54,19 @@ export default function InventarioModal({
     const descripcion = formValues.descripcion?.trim() || '';
     const categoria = formValues.categoria?.trim() || '';
     const precio = formValues.precio !== undefined && formValues.precio !== null ? String(formValues.precio).trim() : '';
-    const today = getTodayInputDate();
 
     if (!idProducto) {
       // if no product selected, nombre is required to create a new product
       if (!nombre) nextErrors.nombre = 'Debes ingresar el nombre del producto';
       else if (!nombreRegex.test(nombre)) nextErrors.nombre = 'El nombre contiene caracteres no permitidos';
-      else if (/^\d+$/.test(nombre)) nextErrors.nombre = 'El nombre no puede contener solo números';
 
       if (!descripcion) nextErrors.descripcion = 'La descripción es obligatoria';
       if (!categoria) nextErrors.categoria = 'La categoría es obligatoria';
-      else if (!categoriaRegex.test(categoria)) nextErrors.categoria = 'La categoría solo debe contener letras y espacios';
       if (!precio) nextErrors.precio = 'El precio es obligatorio';
-      else if (!/^\d{1,4}(?:\.\d{1,2})?$/.test(precio)) nextErrors.precio = 'El precio debe tener hasta 4 dígitos y hasta 2 decimales';
-      else if (Number(precio) > 9999.99) nextErrors.precio = 'El precio no puede ser mayor a 9999.99';
+      else if (!/^\d+(?:\.\d{1,2})?$/.test(precio)) nextErrors.precio = 'Formato de precio inválido';
     } else {
       // If editing, still validate name characters if provided
       if (nombre && !nombreRegex.test(nombre)) nextErrors.nombre = 'El nombre contiene caracteres no permitidos';
-      else if (nombre && /^\d+$/.test(nombre)) nextErrors.nombre = 'El nombre no puede contener solo números';
-      if (categoria && !categoriaRegex.test(categoria)) nextErrors.categoria = 'La categoría solo debe contener letras y espacios';
-      // If precio provided while editing, validate format and range
-      if (precio) {
-        if (!/^\d{1,4}(?:\.\d{1,2})?$/.test(precio)) nextErrors.precio = 'El precio debe tener hasta 4 dígitos y hasta 2 decimales';
-        else if (Number(precio) > 9999.99) nextErrors.precio = 'El precio no puede ser mayor a 9999.99';
-      }
     }
 
     if (!stockProducto && !isEditing) {
@@ -311,136 +260,113 @@ export default function InventarioModal({
             </div>
           </div>
         ) : (
-        <form key={formKey} className="inventario-form" onSubmit={handleSubmit} noValidate onInvalid={(e) => e.preventDefault()}>
-          {/* Do not show a product selector. When editing include a hidden id field so submit sends id_producto */}
-          {isEditing && (
-            <input type="hidden" name="id_producto" defaultValue={initialData?.id_producto ? String(initialData.id_producto) : ''} />
-          )}
+          <form key={formKey} className="inventario-form" onSubmit={handleSubmit}>
+            {/* Do not show a product selector. When editing include a hidden id field so submit sends id_producto */}
+            {isEditing && (
+              <input type="hidden" name="id_producto" defaultValue={initialData?.id_producto ? String(initialData.id_producto) : ''} />
+            )}
 
-          {/* Product fields: show for both create and edit; when editing prefill from initialData */}
-          <div className="new-product-fields">
-            <div className="form-group">
-              <label htmlFor="nombre">Nombre del producto *</label>
-              <input
-                id="nombre"
-                name="nombre"
-                type="text"
-                defaultValue={initialData?.producto?.nombre ?? initialData?.nombre ?? ''}
-                onChange={handleChange}
-                className={errors.nombre ? 'input-error' : ''}
-              />
-              {errors.nombre && <span className="error-text">{errors.nombre}</span>}
+            {/* Product fields: show for both create and edit; when editing prefill from initialData */}
+            <div className="new-product-fields">
+              <div className="form-group">
+                <label htmlFor="nombre">Nombre del producto *</label>
+                <input
+                  id="nombre"
+                  name="nombre"
+                  type="text"
+                  defaultValue={initialData?.producto?.nombre ?? initialData?.nombre ?? ''}
+                  onChange={handleChange}
+                  className={errors.nombre ? 'input-error' : ''}
+                />
+                {errors.nombre && <span className="error-text">{errors.nombre}</span>}
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="descripcion">Descripción</label>
+                <input
+                  id="descripcion"
+                  name="descripcion"
+                  type="text"
+                  defaultValue={initialData?.producto?.descripcion ?? initialData?.descripcion ?? ''}
+                  onChange={handleChange}
+                  required
+                  className={errors.descripcion ? 'input-error' : ''}
+                />
+                {errors.descripcion && <span className="error-text">{errors.descripcion}</span>}
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="categoria">Categoría</label>
+                <input
+                  id="categoria"
+                  name="categoria"
+                  type="text"
+                  defaultValue={initialData?.producto?.categoria ?? initialData?.categoria ?? ''}
+                  onChange={handleChange}
+                  required
+                  className={errors.categoria ? 'input-error' : ''}
+                />
+                {errors.categoria && <span className="error-text">{errors.categoria}</span>}
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="precio">Precio</label>
+                <input
+                  id="precio"
+                  name="precio"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  defaultValue={initialData?.precio !== undefined && initialData.precio !== null ? String(initialData.precio) : (initialData?.producto?.precio !== undefined && initialData.producto.precio !== null ? String(initialData.producto.precio) : '')}
+                  onChange={handleChange}
+                  required
+                  className={errors.precio ? 'input-error' : ''}
+                />
+                {errors.precio && <span className="error-text">{errors.precio}</span>}
+              </div>
             </div>
 
-            <div className="form-group">
-              <label htmlFor="descripcion">Descripción</label>
-              <input
-                id="descripcion"
-                name="descripcion"
-                type="text"
-                defaultValue={initialData?.producto?.descripcion ?? initialData?.descripcion ?? ''}
-                onChange={handleChange}
-                required
-                className={errors.descripcion ? 'input-error' : ''}
-              />
-              {errors.descripcion && <span className="error-text">{errors.descripcion}</span>}
+            <div className="form-row">
+              <div className="form-group">
+                <label htmlFor="stock_producto">Cantidad Actual *</label>
+                <input
+                  id="stock_producto"
+                  name="stock_producto"
+                  type="number"
+                  min="0"
+                  defaultValue={initialData?.stock_producto !== undefined ? String(initialData.stock_producto) : ''}
+                  onChange={handleChange}
+                  className={errors.stock_producto ? 'input-error' : ''}
+                  placeholder="0"
+                />
+                {errors.stock_producto && <span className="error-text">{errors.stock_producto}</span>}
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="stock_minimo">Stock Mínimo *</label>
+                <input
+                  id="stock_minimo"
+                  name="stock_minimo"
+                  type="number"
+                  min="0"
+                  defaultValue={initialData?.stock_minimo !== undefined ? String(initialData.stock_minimo) : ''}
+                  onChange={handleChange}
+                  className={errors.stock_minimo ? 'input-error' : ''}
+                  placeholder="0"
+                />
+                {errors.stock_minimo && <span className="error-text">{errors.stock_minimo}</span>}
+              </div>
             </div>
 
-            <div className="form-group">
-              <label htmlFor="categoria">Categoría</label>
-              <input
-                id="categoria"
-                name="categoria"
-                type="text"
-                defaultValue={initialData?.producto?.categoria ?? initialData?.categoria ?? ''}
-                onChange={handleLettersChange}
-                onPaste={handleLettersPaste}
-                required
-                className={errors.categoria ? 'input-error' : ''}
-              />
-              {errors.categoria && <span className="error-text">{errors.categoria}</span>}
+            {/* Movement UI removed per request */}
+
+            <div className="modal-footer">
+              <button type="button" className="btn btn-secondary btn-modal-cancel" onClick={closeModal}>Cancelar</button>
+              <button type="submit" className="btn btn-primary btn-modal-save" disabled={isLoading}>
+                {isLoading ? 'Guardando...' : 'Guardar'}
+              </button>
             </div>
-
-            <div className="form-group">
-              <label htmlFor="precio">Precio</label>
-              <input
-                id="precio"
-                name="precio"
-                type="text"
-                inputMode="decimal"
-                placeholder="0.00"
-                maxLength={7}
-                defaultValue={initialData?.precio !== undefined && initialData.precio !== null ? String(initialData.precio) : (initialData?.producto?.precio !== undefined && initialData.producto.precio !== null ? String(initialData.producto.precio) : '')}
-                onChange={handlePrecioChange}
-                onPaste={handlePrecioPaste}
-                onBlur={(e) => validateField('precio', e.target.value)}
-                required
-                className={errors.precio ? 'input-error' : ''}
-              />
-              {errors.precio && <span className="error-text">{errors.precio}</span>}
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="fecha_caducidad">Fecha de caducidad <span style={{ fontWeight: 400 }}>(opcional)</span></label>
-              <input
-                id="fecha_caducidad"
-                name="fecha_caducidad"
-                type="date"
-                min={getTodayInputDate()}
-                max={getMaxInputDate()}
-                defaultValue={toInputDate(initialData?.fecha_caducidad)}
-                onChange={handleChange}
-                className={errors.fecha_caducidad ? 'input-error' : ''}
-              />
-              {errors.fecha_caducidad && <span className="error-text">{errors.fecha_caducidad}</span>}
-            </div>
-          </div>
-
-          <div className="form-row">
-            <div className="form-group">
-              <label htmlFor="stock_producto">Cantidad Actual *</label>
-              <input
-                id="stock_producto"
-                name="stock_producto"
-                type="text"
-                inputMode="numeric"
-                placeholder="0"
-                maxLength={3}
-                defaultValue={initialData?.stock_producto !== undefined ? String(initialData.stock_producto) : ''}
-                onChange={handleInteger3Change}
-                onPaste={handleInteger3Paste}
-                className={errors.stock_producto ? 'input-error' : ''}
-              />
-              {errors.stock_producto && <span className="error-text">{errors.stock_producto}</span>}
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="stock_minimo">Stock Mínimo *</label>
-              <input
-                id="stock_minimo"
-                name="stock_minimo"
-                type="text"
-                inputMode="numeric"
-                placeholder="0"
-                maxLength={3}
-                defaultValue={initialData?.stock_minimo !== undefined ? String(initialData.stock_minimo) : ''}
-                onChange={handleInteger3Change}
-                onPaste={handleInteger3Paste}
-                className={errors.stock_minimo ? 'input-error' : ''}
-              />
-              {errors.stock_minimo && <span className="error-text">{errors.stock_minimo}</span>}
-            </div>
-          </div>
-
-          {/* Movement UI removed per request */}
-
-          <div className="modal-footer">
-            <button type="button" className="btn btn-secondary btn-modal-cancel" onClick={closeModal}>Cancelar</button>
-            <button type="submit" className="btn btn-primary btn-modal-save" disabled={isLoading}>
-              {isLoading ? 'Guardando...' : 'Guardar'}
-            </button>
-          </div>
-        </form>
+          </form>
         )}
       </div>
     </div>

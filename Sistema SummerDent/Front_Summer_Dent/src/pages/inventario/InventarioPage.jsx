@@ -1,6 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, ChevronUp } from 'lucide-react';
-import { useAuthStore } from '../../store/authStore';
+import { useMemo, useState } from 'react';
 import ConfirmModal from '../../components/ui/ConfirmModal';
 import Button from '../../components/ui/Button';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -331,7 +329,8 @@ export default function InventarioPage() {
         if (movementDetallePago) payload.detalle_pago = movementDetallePago;
       }
 
-      await registrarMovimientoInventario(payload);
+      await registrarMovimientoInventario({ ...payload, fecha: getLocalDateYYYYMMDD() });
+      // After movement, refresh cache from server so DB timestamps are authoritative
       queryClient.invalidateQueries({ queryKey: ['inventario'] });
       queryClient.invalidateQueries({ queryKey: ['egresos'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-snapshot'] });
@@ -376,12 +375,12 @@ export default function InventarioPage() {
         const createdProductId = res?.producto?.id || res?.inventario?.id_producto || res?.producto?.id_producto;
 
         if (payload.registrarMovimiento && createdProductId) {
-            await registrarMovimientoInventario({
-              id_producto: createdProductId,
-              tipo_movimiento: payload.tipo_movimiento,
-              cantidad: payload.cantidad,
-              fecha: getLocalDateYYYYMMDD()
-            });
+          await registrarMovimientoInventario({
+            id_producto: createdProductId,
+            tipo_movimiento: payload.tipo_movimiento,
+            cantidad: payload.cantidad,
+            fecha: getLocalDateYYYYMMDD()
+          });
         }
       } else {
         const productId = payload.id_producto;
@@ -403,35 +402,6 @@ export default function InventarioPage() {
         console.log('Updating product', productId, updatePayload);
         await updateProducto(productId, updatePayload);
 
-        // If stock decreased compared to previous inventory, create an automatic egreso
-        try {
-          const oldStock = Number(selectedInventario?.stock_producto ?? 0);
-          const newStock = Number(payload.stock_producto !== undefined ? payload.stock_producto : (productData.stock_producto ?? 0));
-          const delta = oldStock - newStock;
-          if (delta > 0) {
-            const pricePerUnit = Number(updatePayload.precio || productData.precio || 0);
-            const monto = Math.round((pricePerUnit * delta) * 100) / 100;
-            const nombreProducto = updatePayload.nombre || productData.nombre || 'producto';
-            const movimientoPayload = {
-              tipo: 'egreso',
-              id_doctor: null,
-              metodo_pago: null,
-              monto: monto,
-              descripcion: `Gasto de "${nombreProducto}" en tratamiento`,
-              fecha: getLocalDateYYYYMMDD()
-            };
-
-            if (sedeActiva) movimientoPayload.sede_id = sedeActiva;
-            await createMovimientoFinanzas(movimientoPayload);
-            // refresh egresos and dashboard totals (per sede)
-            queryClient.invalidateQueries({ queryKey: ['egresos', sedeActiva] });
-            queryClient.invalidateQueries({ queryKey: ['dashboard-snapshot', sedeActiva] });
-          }
-        } catch (err) {
-          console.error('No se pudo crear egreso automático por disminución de stock:', err);
-          // don't block the main flow; surface a non-fatal message
-          setErrorMessage('Producto actualizado, pero no se pudo registrar automáticamente el egreso.');
-        }
 
         if (payload.registrarMovimiento) {
           await registrarMovimientoInventario({
@@ -488,21 +458,18 @@ export default function InventarioPage() {
       )}
 
       <div className="inventario-filters">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', flex: '1 1 0' }}>
-          <label style={{ fontWeight: 700, fontSize: '0.85rem' }}>Búsqueda</label>
-          <div className="search-container search-container--finance search-container--compact">
-            <svg className="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="11" cy="11" r="8" />
-              <path d="m21 21-4.35-4.35" />
-            </svg>
-            <input
-              type="text"
-              className="search-input"
-              placeholder="Buscar por producto, stock o perfil..."
-              value={searchTerm}
-              onChange={(event) => setSearchTerm(event.target.value)}
-            />
-          </div>
+        <div className="search-container search-container--finance search-container--compact">
+          <svg className="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="11" cy="11" r="8" />
+            <path d="m21 21-4.35-4.35" />
+          </svg>
+          <input
+            type="text"
+            className="search-input"
+            placeholder="Buscar por producto, stock o perfil..."
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+          />
         </div>
 
         {/* date filter removed per user request */}
