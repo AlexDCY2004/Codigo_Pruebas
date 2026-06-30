@@ -1,5 +1,5 @@
 import { getSupabaseClientWithToken, supabase, supabaseAdmin } from '../configuracionesDB/supabaseClient.js';
-import { actualizarTotalesCajaParaPeriodo, normalizeMetodoPago } from './movimientoFinanzasController.js';
+import { normalizeMetodoPago } from './movimientoFinanzasController.js';
 import { getPerfilFromToken } from '../utils/perfilUtils.js';
 import { getAuthTokenFromReq } from '../utils/authUtils.js';
 
@@ -436,7 +436,6 @@ export const actualizarCitaController = async (req, res) => {
             .select('id, descripcion, metodo_pago, created_at')
             .is('id_perfil', null)
             .eq('id_doctor', Number(data.id_doctor))
-            .eq('tipo', 'ingreso')
             .eq('monto', Number(data.precio || 0))
             .eq('fecha', citaFecha)
             .order('created_at', { ascending: false })
@@ -452,22 +451,12 @@ export const actualizarCitaController = async (req, res) => {
             }
 
             await finClient.from('movimiento_finanzas').update(updateObj).eq('id', movNull.id);
-            // Recalculate caja totals for the cita period
-            try {
-              const parts = String(citaFecha).split('-');
-              const y = Number(parts[0]);
-              const m = Number(parts[1]);
-              if (!Number.isNaN(y) && !Number.isNaN(m) && finClient) await actualizarTotalesCajaParaPeriodo(finClient, data.sede_id || perfil?.sede_id, y, m);
-            } catch (e) {
-              // don't block flow
-            }
           } else {
           // Si no existe el movimiento creado por el trigger, crear uno explícitamente
             try {
             const createObj = {
               id_perfil: perfilId,
               id_doctor: Number(data.id_doctor),
-              tipo: 'ingreso',
               monto: Number(data.precio || 0),
               descripcion: detalle_pago ? String(detalle_pago) : (data.tratamientos ? `consulta de: ${data.tratamientos}` : ''),
               fecha: citaFecha,
@@ -481,15 +470,6 @@ export const actualizarCitaController = async (req, res) => {
               else if (perfil && perfil.sede_id) createObj.sede_id = perfil.sede_id;
             } catch (e) {}
             await finClient.from('movimiento_finanzas').insert([createObj]);
-            // After creating movement, recalculate caja totals for the cita's month
-            try {
-              const parts2 = String(citaFecha).split('-');
-              const y2 = Number(parts2[0]);
-              const m2 = Number(parts2[1]);
-              if (!Number.isNaN(y2) && !Number.isNaN(m2) && finClient) await actualizarTotalesCajaParaPeriodo(finClient, createObj.sede_id || data.sede_id || perfil?.sede_id, y2, m2);
-            } catch (e) {
-              // ignore
-            }
           } catch (e) {
             // no bloquear flujo principal
           }

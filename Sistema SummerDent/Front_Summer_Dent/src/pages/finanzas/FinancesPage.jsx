@@ -1,25 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, ChevronUp, Eye } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
-import {
-  ResponsiveContainer,
-  ComposedChart,
-  Bar,
-  Line,
-  CartesianGrid,
-  XAxis,
-  YAxis,
-  Tooltip
-} from 'recharts';
 import { fetchMovimientosFinanzas } from '../../services/api/movimientoFinanzas';
 import ErrorState from '../../components/feedback/ErrorState';
 import Button from '../../components/ui/Button';
-
-const PERIODS = {
-  diario: 'diario',
-  semanal: 'semanal',
-  mensual: 'mensual'
-};
 
 const MOVIMIENTOS_POR_PAGINA = 15;
 
@@ -50,7 +34,6 @@ const formatDate = (value) => {
 
 const toLocalDateKey = (value) => {
   if (!value) return null;
-  // if value already in YYYY-MM-DD format, return as-is
   if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return null;
@@ -68,94 +51,10 @@ const getDoctorLabel = (movimiento) => {
   return '-';
 };
 
-const getMovementLabel = (movimiento) => (movimiento.tipo === 'egreso' ? 'Egreso' : 'Ingreso');
-
-//const getMovementSign = (tipo) => (tipo === 'egreso' ? '-' : '+');
-
-const getMovementClass = (tipo) => (tipo === 'egreso' ? 'movement-row--expense' : 'movement-row--income');
-
-const getTypeBadgeClass = (tipo) => (tipo === 'egreso' ? 'finance-type-badge--expense' : 'finance-type-badge--income');
-
-const formatSignedCurrency = (tipo, value) => {
-  const amount = Math.abs(Number(value ?? 0));
-  const symbol = tipo === 'egreso' ? '-' : '+';
-  return `${symbol}${formatCurrency(amount)}`;
-};
-
-const groupLabelByPeriod = (dateKey, period) => {
-  if (!dateKey) return 'Sin fecha';
-
-  const date = new Date(`${dateKey}T00:00:00`);
-  if (Number.isNaN(date.getTime())) return 'Sin fecha';
-
-  if (period === PERIODS.diario) {
-    return date.toLocaleDateString('es-EC', {
-      day: '2-digit',
-      month: 'short'
-    });
-  }
-
-  if (period === PERIODS.semanal) {
-    const start = new Date(date);
-    start.setDate(start.getDate() - start.getDay());
-    const end = new Date(start);
-    end.setDate(start.getDate() + 6);
-    // Use short month names to make week ranges clearer (e.g. "25-may - 31-may")
-    return `${start.toLocaleDateString('es-EC', { day: '2-digit', month: 'short' })} - ${end.toLocaleDateString('es-EC', { day: '2-digit', month: 'short' })} ${start.getFullYear()}`;
-  }
-
-  return date.toLocaleDateString('es-EC', {
-    year: 'numeric',
-    month: 'short'
-  });
-};
-
-const getGroupKeyByPeriod = (dateKey, period) => {
-  if (!dateKey) return 'sin-fecha';
-
-  const date = new Date(`${dateKey}T00:00:00`);
-  if (Number.isNaN(date.getTime())) return 'sin-fecha';
-
-  if (period === PERIODS.diario) {
-    return dateKey;
-  }
-
-  if (period === PERIODS.semanal) {
-    const start = new Date(date);
-    start.setDate(start.getDate() - start.getDay());
-    const y = start.getFullYear();
-    const m = String(start.getMonth() + 1).padStart(2, '0');
-    const d = String(start.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
-  }
-
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-};
-
-const parseGroupKeyToDate = (groupKey, period) => {
-  if (!groupKey) return new Date(0);
-  try {
-    // Guard against placeholder keys like 'sin-fecha' or malformed input
-    if (period === PERIODS.mensual) {
-      // expect YYYY-MM
-      if (!/^[0-9]{4}-[0-1][0-9]$/.test(groupKey)) return new Date(0);
-      return new Date(`${groupKey}-01T00:00:00`);
-    }
-
-    // diario or semanal expect YYYY-MM-DD
-    if (!/^[0-9]{4}-[0-1][0-9]-[0-3][0-9]$/.test(groupKey)) return new Date(0);
-    return new Date(`${groupKey}T00:00:00`);
-  } catch {
-    return new Date(0);
-  }
-};
-
 export default function FinancesPage() {
-  const [period, setPeriod] = useState(PERIODS.mensual);
   const [searchTerm, setSearchTerm] = useState('');
   const [desde, setDesde] = useState('');
   const [hasta, setHasta] = useState('');
-  const [typeFilter] = useState('todos');
   const [metodoFilter, setMetodoFilter] = useState('todos');
   const [isMetodoMenuOpen, setIsMetodoMenuOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -173,7 +72,6 @@ export default function FinancesPage() {
     const normalizedSearch = searchTerm.trim().toLowerCase();
 
     return movimientos.filter((movimiento) => {
-      const matchesType = typeFilter === 'todos' || movimiento.tipo === typeFilter;
       const matchesMetodo = metodoFilter === 'todos' || movimiento.metodo_pago === metodoFilter;
 
       const fechaKey = toLocalDateKey(movimiento.fecha);
@@ -186,7 +84,6 @@ export default function FinancesPage() {
         toLocalDateKey(movimiento.fecha),
         toLocalDateKey(movimiento.created_at),
         movimiento.id_doctor,
-        movimiento.tipo,
         movimiento.monto,
         movimiento.descripcion,
         getDoctorLabel(movimiento)
@@ -196,60 +93,26 @@ export default function FinancesPage() {
 
       const matchesSearch = !normalizedSearch || searchableFields.some((field) => field.includes(normalizedSearch));
 
-      return matchesType && matchesDate && matchesSearch && matchesMetodo;
+      return matchesDate && matchesSearch && matchesMetodo;
     });
-  }, [desde, hasta, movimientos, searchTerm, typeFilter, metodoFilter]);
+  }, [desde, hasta, movimientos, searchTerm, metodoFilter]);
 
-  const totalIngresos = useMemo(
-    () => filteredMovimientos
-      .filter((movimiento) => movimiento.tipo === 'ingreso')
-      .reduce((acc, movimiento) => acc + Number(movimiento.monto || 0), 0),
+  const totalMovimientos = useMemo(
+    () => filteredMovimientos.reduce((acc, m) => acc + Number(m.monto || 0), 0),
     [filteredMovimientos]
   );
 
-  const totalEgresos = useMemo(
-    () => filteredMovimientos
-      .filter((movimiento) => movimiento.tipo === 'egreso')
-      .reduce((acc, movimiento) => acc + Number(movimiento.monto || 0), 0),
+  const movimientosCount = filteredMovimientos.length;
+
+  const efectivoTotal = useMemo(
+    () => filteredMovimientos.filter((m) => m.metodo_pago === 'efectivo').reduce((acc, m) => acc + Number(m.monto || 0), 0),
     [filteredMovimientos]
   );
 
-  const balance = totalIngresos - totalEgresos;
-
-  const chartData = useMemo(() => {
-    const buckets = new Map();
-
-    filteredMovimientos.forEach((movimiento) => {
-      const keyDate = toLocalDateKey(movimiento.fecha);
-      const groupKey = getGroupKeyByPeriod(keyDate, period);
-
-      if (!buckets.has(groupKey)) {
-        buckets.set(groupKey, {
-          label: groupLabelByPeriod(keyDate, period),
-          ingresos: 0,
-          egresos: 0
-        });
-      }
-
-      const bucket = buckets.get(groupKey);
-      const amount = Number(movimiento.monto || 0);
-
-      if (movimiento.tipo === 'egreso') {
-        bucket.egresos += amount;
-      } else {
-        bucket.ingresos += amount;
-      }
-    });
-
-    // Sort buckets by their group date to ensure chronological order on the chart
-    const sorted = Array.from(buckets.entries()).sort((a, b) => {
-      const aDate = parseGroupKeyToDate(a[0], period);
-      const bDate = parseGroupKeyToDate(b[0], period);
-      return aDate - bDate;
-    }).map(([, value]) => ({ ...value, balance: value.ingresos - value.egresos }));
-
-    return sorted;
-  }, [filteredMovimientos, period]);
+  const transferenciaTotal = useMemo(
+    () => filteredMovimientos.filter((m) => m.metodo_pago === 'transferencia').reduce((acc, m) => acc + Number(m.monto || 0), 0),
+    [filteredMovimientos]
+  );
 
   const totalPages = Math.max(1, Math.ceil(filteredMovimientos.length / MOVIMIENTOS_POR_PAGINA));
 
@@ -274,9 +137,8 @@ export default function FinancesPage() {
 
   const renderMovimientoDetails = (movimiento) => [
     { label: 'Doctor', value: getDoctorLabel(movimiento) },
-    { label: 'Tipo', value: getMovementLabel(movimiento) },
     { label: 'Método de pago', value: movimiento.metodo_pago || '-' },
-    { label: 'Monto', value: formatSignedCurrency(movimiento.tipo, movimiento.monto) },
+    { label: 'Monto', value: formatCurrency(movimiento.monto) },
     { label: 'Descripción', value: movimiento.descripcion || '-' },
     { label: 'Fecha Registro', value: formatDate(movimiento.created_at) }
   ];
@@ -319,35 +181,6 @@ export default function FinancesPage() {
     setIsMetodoMenuOpen(false);
   };
 
-  const renderChartTooltip = ({ active, payload, label }) => {
-    if (!active || !payload?.length) return null;
-
-    const ingresos = payload.find((item) => item.dataKey === 'ingresos')?.value ?? 0;
-    const egresos = payload.find((item) => item.dataKey === 'egresos')?.value ?? 0;
-    const balanceValue = ingresos - egresos;
-    const balanceText = balanceValue === 0
-      ? formatCurrency(0)
-      : formatSignedCurrency(balanceValue > 0 ? 'ingreso' : 'egreso', Math.abs(balanceValue));
-
-    return (
-      <div className="finance-chart-tooltip">
-        <div className="finance-chart-tooltip__title">{label}</div>
-        <div className="finance-chart-tooltip__row finance-chart-tooltip__row--income">
-          <span>Ingresos</span>
-          <strong>{formatCurrency(ingresos)}</strong>
-        </div>
-        <div className="finance-chart-tooltip__row finance-chart-tooltip__row--expense">
-          <span>Egresos</span>
-          <strong>{formatCurrency(egresos)}</strong>
-        </div>
-        <div className="finance-chart-tooltip__row finance-chart-tooltip__row--balance">
-          <span>Balance</span>
-          <strong>{balanceText}</strong>
-        </div>
-      </div>
-    );
-  };
-
   useEffect(() => {
     const id = setTimeout(() => setCurrentPage((page) => Math.min(page, totalPages)), 0);
     return () => clearTimeout(id);
@@ -366,105 +199,24 @@ export default function FinancesPage() {
         </div>
       </div>
 
-      <div className="finance-summary-grid finance-summary-grid--overview">
-        <section className="finance-total-card finance-total-card--income">
+      <div className="finance-summary-grid">
+        <section className="finance-total-card">
           <span>Total Ingresos</span>
-          <strong>{formatCurrency(totalIngresos)}</strong>
+          <strong>{formatCurrency(totalMovimientos)}</strong>
         </section>
-
-        <section className="finance-total-card finance-total-card--expense">
-          <span>Total Egresos</span>
-          <strong>{formatCurrency(totalEgresos)}</strong>
+        <section className="finance-total-card finance-total-card--count">
+          <span>Cantidad de Movimientos</span>
+          <strong>{movimientosCount}</strong>
         </section>
-
-        <section className="finance-total-card finance-total-card--balance">
-          <span>Balance</span>
-          <strong>{formatCurrency(balance)}</strong>
+        <section className="finance-total-card finance-total-card--cash">
+          <span>Efectivo</span>
+          <strong>{formatCurrency(efectivoTotal)}</strong>
+        </section>
+        <section className="finance-total-card finance-total-card--transfer">
+          <span>Transferencia</span>
+          <strong>{formatCurrency(transferenciaTotal)}</strong>
         </section>
       </div>
-
-      <section className="finance-chart-card">
-        <div className="finance-chart-card__header">
-          <div className="finance-chart-card__header-left">
-            <h2>Resumen</h2>
-            <div className="finance-chart__legend finance-chart__legend--header">
-              <span><i className="legend-dot legend-dot--income" />Ingresos</span>
-              <span><i className="legend-dot legend-dot--expense" />Egresos</span>
-              <span><i className="legend-dot legend-dot--balance" />Balance</span>
-            </div>
-            <div className={balance >= 0 ? 'finance-chart__balance-pill finance-chart__balance-pill--positive' : 'finance-chart__balance-pill finance-chart__balance-pill--negative'}>
-              <span>Balance neto del periodo</span>
-              <strong>{balance === 0 ? formatCurrency(0) : formatSignedCurrency(balance > 0 ? 'ingreso' : 'egreso', Math.abs(balance))}</strong>
-            </div>
-          </div>
-          <div className="finance-period-toggle" role="tablist" aria-label="Periodo del gráfico financiero">
-            <button
-              type="button"
-              className={period === PERIODS.diario ? 'toggle-pill toggle-pill--active' : 'toggle-pill'}
-              onClick={() => setPeriod(PERIODS.diario)}
-            >
-              Diario
-            </button>
-            <button
-              type="button"
-              className={period === PERIODS.semanal ? 'toggle-pill toggle-pill--active' : 'toggle-pill'}
-              onClick={() => setPeriod(PERIODS.semanal)}
-            >
-              Semanal
-            </button>
-            <button
-              type="button"
-              className={period === PERIODS.mensual ? 'toggle-pill toggle-pill--active' : 'toggle-pill'}
-              onClick={() => setPeriod(PERIODS.mensual)}
-            >
-              Mensual
-            </button>
-          </div>
-        </div>
-
-        {isLoading ? (
-          <div className="finance-chart-skeleton" />
-        ) : chartData.length === 0 ? (
-          <div className="empty-state finance-empty-state">
-            <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>📊</div>
-            <h3>No hay datos suficientes para el gráfico</h3>
-            <p>Agrega movimientos o cambia los filtros para ver la evolución financiera.</p>
-          </div>
-        ) : (
-          <div className="finance-chart">
-            <div className="finance-chart__plot finance-chart__plot--recharts">
-              <div
-                className="finance-chart__plot-inner"
-                style={{ width: `${Math.max(chartData.length * 140, 100)}px` }}
-              >
-                <ResponsiveContainer width="100%" height={380}>
-                  <ComposedChart data={chartData} margin={{ top: 12, right: 20, left: 8, bottom: 8 }}>
-                  <CartesianGrid stroke="#b3c4da" strokeDasharray="4 4" vertical={false} />
-                  <XAxis
-                    dataKey="label"
-                    tick={{ fill: '#52627a', fontSize: 12 }}
-                    tickLine={false}
-                    axisLine={false}
-                    interval={0}
-                    minTickGap={24}
-                  />
-                  <YAxis
-                    tick={{ fill: '#52627a', fontSize: 12 }}
-                    tickLine={false}
-                    axisLine={false}
-                    width={92}
-                    tickFormatter={(value) => formatCurrency(value)}
-                  />
-                  <Tooltip content={renderChartTooltip} cursor={{ fill: 'rgba(59, 130, 246, 0.06)' }} />
-                  <Bar dataKey="ingresos" name="Ingresos" fill="#10b981" radius={[10, 10, 0, 0]} barSize={24} />
-                  <Bar dataKey="egresos" name="Egresos" fill="#ef4444" radius={[10, 10, 0, 0]} barSize={24} />
-                  </ComposedChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          </div>
-        )}
-      </section>
 
       <section className="finance-history-card">
         <div className="finance-history-card__header">
@@ -570,7 +322,6 @@ export default function FinancesPage() {
               {[...Array(6)].map((_, index) => (
                 <div key={index} className="skeleton-row skeleton-row--finance">
                   <div className="skeleton-cell" style={{ width: '12%' }} />
-                  <div className="skeleton-cell" style={{ width: '8%' }} />
                   <div className="skeleton-cell" style={{ width: '18%' }} />
                   <div className="skeleton-cell" style={{ width: '12%' }} />
                   <div className="skeleton-cell" style={{ width: '10%' }} />
@@ -591,7 +342,6 @@ export default function FinancesPage() {
                 <thead>
                   <tr>
                     <th>Doctor</th>
-                    <th>Tipo</th>
                     <th>Método de pago</th>
                     <th>Monto</th>
                     <th>Descripción</th>
@@ -600,17 +350,10 @@ export default function FinancesPage() {
                 </thead>
                 <tbody>
                   {paginatedMovimientos.map((movimiento) => (
-                    <tr key={movimiento.id} className={getMovementClass(movimiento.tipo)}>
+                    <tr key={movimiento.id}>
                       <td>{getDoctorLabel(movimiento)}</td>
-                      <td>
-                        <span className={`finance-type-badge ${getTypeBadgeClass(movimiento.tipo)}`}>
-                          {movimiento.tipo || 'sin tipo'}
-                        </span>
-                      </td>
                       <td>{movimiento.metodo_pago || '-'}</td>
-                      <td className={movimiento.tipo === 'egreso' ? 'finance-amount finance-amount--expense' : 'finance-amount finance-amount--income'}>
-                        {formatSignedCurrency(movimiento.tipo, movimiento.monto)}
-                      </td>
+                      <td>{formatCurrency(movimiento.monto)}</td>
                       <td className="finance-description">{movimiento.descripcion || '-'}</td>
                       <td>{formatDate(movimiento.created_at)}</td>
                     </tr>
@@ -621,10 +364,9 @@ export default function FinancesPage() {
               <div className="finance-history-mobile-list" aria-label="Historial de movimientos en móvil">
                 {paginatedMovimientos.map((movimiento) => {
                   const isExpanded = expandedMovimientoId === movimiento.id;
-                  const amountLabel = formatSignedCurrency(movimiento.tipo, movimiento.monto);
 
                   return (
-                    <article key={movimiento.id} className={`finance-history-mobile-card ${getMovementClass(movimiento.tipo)}`}>
+                    <article key={movimiento.id} className="finance-history-mobile-card">
                       <div className="finance-history-mobile-card__summary">
                         <button
                           type="button"
@@ -646,8 +388,8 @@ export default function FinancesPage() {
                           aria-controls={`movimiento-mobile-details-${movimiento.id}`}
                         >
                           <span className="finance-history-mobile-card__amount-label">Monto</span>
-                          <span className={movimiento.tipo === 'egreso' ? 'finance-history-mobile-card__amount finance-history-mobile-card__amount--expense' : 'finance-history-mobile-card__amount finance-history-mobile-card__amount--income'}>
-                            <strong>{amountLabel}</strong>
+                          <span className="finance-history-mobile-card__amount">
+                            <strong>{formatCurrency(movimiento.monto)}</strong>
                           </span>
                         </button>
 
@@ -665,14 +407,6 @@ export default function FinancesPage() {
 
                       {isExpanded ? (
                         <div className="finance-history-mobile-card__details" id={`movimiento-mobile-details-${movimiento.id}`}>
-                          <div className="finance-history-mobile-card__row">
-                            <span className="finance-history-mobile-card__label">Tipo</span>
-                            <span className="finance-history-mobile-card__value">
-                              <span className={`finance-type-badge ${getTypeBadgeClass(movimiento.tipo)}`}>
-                                {movimiento.tipo || 'sin tipo'}
-                              </span>
-                            </span>
-                          </div>
                           {renderMovimientoDetails(movimiento).map((item) => (
                             <div key={item.label} className="finance-history-mobile-card__row">
                               <span className="finance-history-mobile-card__label">{item.label}</span>
@@ -685,34 +419,37 @@ export default function FinancesPage() {
                   );
                 })}
               </div>
-
-              <div className="finance-pagination">
-                <div className="finance-pagination__info">
-                  Mostrando {Math.min(filteredMovimientos.length, (currentPage - 1) * MOVIMIENTOS_POR_PAGINA + 1)}-
-                  {Math.min(filteredMovimientos.length, currentPage * MOVIMIENTOS_POR_PAGINA)} de {filteredMovimientos.length}
-                </div>
-                <div className="finance-pagination__controls">
-                  <Button
-                    variant="secondary"
-                    onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
-                    disabled={currentPage <= 1}
-                  >
-                    Anterior
-                  </Button>
-                  <span className="finance-pagination__page">Página {currentPage} de {totalPages}</span>
-                  <Button
-                    variant="secondary"
-                    onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
-                    disabled={currentPage >= totalPages}
-                  >
-                    Siguiente
-                  </Button>
-                </div>
-              </div>
             </>
           )}
         </div>
+
       </section>
+
+        {!isLoading && filteredMovimientos.length > 0 && (
+          <div className="finance-pagination">
+            <div className="finance-pagination__info">
+              Mostrando {Math.min(filteredMovimientos.length, (currentPage - 1) * MOVIMIENTOS_POR_PAGINA + 1)}-
+              {Math.min(filteredMovimientos.length, currentPage * MOVIMIENTOS_POR_PAGINA)} de {filteredMovimientos.length}
+            </div>
+            <div className="finance-pagination__controls">
+              <Button
+                variant="secondary"
+                onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                disabled={currentPage <= 1}
+              >
+                Anterior
+              </Button>
+              <span className="finance-pagination__page">Página {currentPage} de {totalPages}</span>
+              <Button
+                variant="secondary"
+                onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                disabled={currentPage >= totalPages}
+              >
+                Siguiente
+              </Button>
+            </div>
+          </div>
+        )}
 
       {isDetailOpen && selectedMovimiento ? (
         <div className="modal-overlay" onClick={closeMovimientoDetail}>

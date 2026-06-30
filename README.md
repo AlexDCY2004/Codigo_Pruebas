@@ -86,19 +86,19 @@ npm run preview
 - CORS: añade la URL del frontend en `FRONTEND_URL` si el navegador bloquea solicitudes.
 
 ## Qué contiene este repositorio
-- `Back_Summer_Dent`: API REST en Node/Express que gestiona productos, inventario, citas, pacientes, doctores, tratamientos y movimientos financieros. Se integra con Supabase/Postgres.
+- `Back_Summer_Dent`: API REST en Node/Express que gestiona productos, citas, pacientes, doctores, tratamientos y movimientos financieros. Se integra con Supabase/Postgres.
 - `Front_Summer_Dent`: Cliente en React (Vite) con vistas para:
   - Autenticación (`/login`).
   - Dashboard: resumen del consultorio, accesos rápidos, `Citas de Hoy` y `Próximas Citas`.
-  - Gestión de `Pacientes`, `Citas`, `Doctores`, `Inventario`, `Tratamientos` y `Finanzas`.
-  - Componentes reutilizables: modales para crear/editar (`PacienteModal`, `CitaModal`, `InventarioModal`, etc.), tablas, y elementos UI.
+  - Gestión de `Pacientes`, `Citas`, `Doctores`, `Tratamientos` y `Finanzas`.
+  - Componentes reutilizables: modales para crear/editar (`PacienteModal`, `CitaModal`, etc.), tablas, y elementos UI.
 
 ## Cómo usar la aplicación cuando esté corriendo
 1. Accede a la URL del frontend (por defecto `http://localhost:5173`).
 2. Inicia sesión en la ruta de login si la aplicación lo requiere.
 3. Navegación principal:
-	- Usa el menú/side bar para moverte entre `Dashboard`, `Pacientes`, `Citas`, `Doctores`, `Inventario`, `Finanzas` y `Tratamientos`.
-	- En el `Dashboard` encontrarás botones de acceso rápido: `Gestionar Pacientes`, `Ver Citas`, `Registrar Ingreso` y `Revisar Inventario`.
+	- Usa el menú/side bar para moverte entre `Dashboard`, `Pacientes`, `Citas`, `Doctores`, `Finanzas` y `Tratamientos`.
+	- En el `Dashboard` encontrarás botones de acceso rápido: `Gestionar Pacientes`, `Ver Citas` y `Registrar Ingreso`.
 4. Citas:
 	- `Citas de Hoy`: lista de las citas programadas para el día actual.
 	- `Próximas Citas`: próximas citas programadas (muestra nombre de paciente, fecha, hora y estado).
@@ -106,9 +106,7 @@ npm run preview
 5. Pacientes:
 	- Añade, edita o busca pacientes desde la vista `Pacientes`.
 	- Los modales permiten completar nombre, cédula, teléfono y observaciones.
-6. Inventario y Productos:
-	- Revisa stock, registra entradas/salidas y administra productos.
-7. Finanzas:
+6. Finanzas:
 	- Registra movimientos (ingresos/egresos) desde la vista `Finanzas` o el acceso rápido del `Dashboard`.
 
 
@@ -132,40 +130,6 @@ npm run preview
 	- Si la cita cambia a `Atendida`, el servidor intentará crear (o completar) un `movimiento_finanzas` de tipo `ingreso` con el monto de la cita (`precio`).
 	- Si la base de datos tiene triggers que crean el movimiento, el controlador del backend asignará `id_perfil` y `metodo_pago` al movimiento si se envían.
 	- Respuesta: JSON con `{ mensaje: 'Cita actualizada', cita: {...} }`.
-
-### 2) Registrar una venta / salida de inventario (vender un producto)
-- Endpoint: `POST /api/inventario/movimiento`
-- Autenticación: requiere header `Authorization: Bearer <token>`.
-- Payload ejemplo para una venta:
-
-```json
-{
-	"id_producto": 123,
-	"tipo_movimiento": "salida",
-	"cantidad": 2,
-	"metodo_pago": "tarjeta",       // opcional
-	"detalle_pago": "Venta en mostrador"
-}
-```
-
-- Efectos:
-	- Se verifica stock suficiente; si no hay inventario, el endpoint falla con error.
-	- Se resta la `cantidad` del inventario del producto.
-	- Se crea un `movimiento_finanzas` de tipo `ingreso` por el total (precio_unitario * cantidad).
-	- Respuesta: JSON con `{ mensaje: 'Salida registrada, stock actualizado y movimiento financiero creado', inventario: {...}, movimiento: {...} }`.
-
-### 3) Registrar entradas de inventario
-- Endpoint: `POST /api/inventario/aumentar` (o `POST /api/inventario/movimiento` con `tipo_movimiento: 'entrada'`).
-- Payload ejemplo:
-
-```json
-{
-	"id_producto": 123,
-	"cantidad": 10
-}
-```
-
-- Efectos: aumenta stock y retorna el inventario actualizado.
 
 ---
 Notas:

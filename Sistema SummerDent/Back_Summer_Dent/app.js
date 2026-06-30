@@ -11,14 +11,12 @@ import {xss} from 'express-xss-sanitizer';
 import { dbConnectSupabase, sequelize } from './src/configuracionesDB/database.js';
 import authRoute from './src/routes/authRoute.js';
 import productoRoute from './src/routes/productoRoute.js';
-import inventarioRoute from './src/routes/inventarioRoute.js';
 import doctorRoute from './src/routes/doctorRoute.js';
 import pacienteRoute from './src/routes/pacienteRoute.js';
 import tratamientoRoute from './src/routes/tratamientoRoute.js';
 import citaRoute from './src/routes/citaRoute.js';
 import movimientoFinanzasRoute from './src/routes/movimientoFinanzasRoute.js';
 import sedeRoute from './src/routes/sedeRoute.js';
-import cajaMensualRoute from './src/routes/cajaMensualRoute.js';
 
 dotenv.config();
 
@@ -127,14 +125,12 @@ app.get('/', (req, res) => {
 
 app.use('/api/auth', authRoute);
 app.use('/api/productos', productoRoute);
-app.use('/api/inventario', inventarioRoute);
 app.use('/api/doctores', doctorRoute);
 app.use('/api/pacientes', pacienteRoute);
 app.use('/api/tratamientos', tratamientoRoute);
 app.use('/api/citas', citaRoute);
 app.use('/api/movimientos-finanzas', movimientoFinanzasRoute);
 app.use('/api/sedes', sedeRoute);
-app.use('/api/caja-mensual', cajaMensualRoute);
 
 const PORT = Number(process.env.PORT || 5000);
 

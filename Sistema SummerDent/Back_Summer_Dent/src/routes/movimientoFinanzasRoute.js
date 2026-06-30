@@ -4,16 +4,12 @@ import {
   obtenerMovimientosController,
   obtenerMovimientoPorIdController,
   actualizarMovimientoController,
-  eliminarMovimientoController,
-  ingresosController,
-  egresosController
+  eliminarMovimientoController
 } from '../controllers/movimientoFinanzasController.js';
 
 const router = Router();
 
 router.get('/', obtenerMovimientosController);
-router.get('/ingresos', ingresosController);
-router.get('/egresos', egresosController);
 router.get('/:id', obtenerMovimientoPorIdController);
 router.post('/', crearMovimientoController);
 router.put('/:id', actualizarMovimientoController);

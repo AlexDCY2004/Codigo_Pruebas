@@ -25,16 +25,6 @@ export const MovimientoFinanzas = sequelize.define(
         isInt: { msg: 'El id_doctor debe ser un entero' }
       }
     },
-    tipo: {
-      type: DataTypes.STRING(20),
-      allowNull: false,
-      validate: {
-        isIn: {
-          args: [['ingreso', 'egreso']],
-          msg: "El tipo debe ser 'ingreso' o 'egreso'"
-        }
-      }
-    },
     monto: {
       type: DataTypes.DECIMAL(10,2),
       allowNull: false,

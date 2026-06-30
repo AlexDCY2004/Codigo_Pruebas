@@ -6,34 +6,29 @@ import LoadingState from '../../components/feedback/LoadingState';
 import { quickActions } from '../../lib/dashboardData';
 import { fetchDashboardSnapshot } from '../../services/api/dashboard';
 import { useEffect } from 'react';
-import CajaMensualPage from '../../pages/finanzas/CajaMensualPage';
-import { fetchCajaMensual } from '../../services/api/cajaMensual';
-import { fetchMovimientosFinanzas } from '../../services/api/movimientoFinanzas';
-import { useAuthStore } from '../../store/authStore';
-import { createMovimientoFinanzas } from '../../services/api/movimientoFinanzas';
 import Button from '../../components/ui/Button';
 
 const statIcons = {
-  'caja-mensual': 'money',
   'citas-hoy': 'calendar',
   'total-ingresos': 'trend-up',
-  'total-egresos': 'trend-down',
-  balance: 'money'
+  'total-doctores': 'users'
 };
 
 const quickActionRoutes = {
-  'Gestionar Pacientes': '/pacientes',
-  'Ver Citas': '/citas',
-  'Registrar Ingreso': '/ingresos',
-  'Revisar Inventario': '/inventario'
+  'Pacientes': '/pacientes',
+  'Citas': '/citas',
+  'Doctores': '/doctores',
+  'Tratamientos': '/tratamientos',
+  'Financiero': '/financiero'
 };
 
   const QuickIcon = ({ action }) => {
     const common = { width: 18, height: 18, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2' };
     if (action.includes('Pacientes')) return <svg {...common}><circle cx="12" cy="8" r="3"/><path d="M5 20c1.5-4 6-6 7-6s5.5 2 7 6"/></svg>;
     if (action.includes('Citas')) return <svg {...common}><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>;
-    if (action.includes('Ingreso')) return <svg {...common}><path d="M12 5v14"/><path d="M19 12h-14"/></svg>;
-    if (action.includes('Inventario')) return <svg {...common}><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>;
+    if (action.includes('Doctores')) return <svg {...common}><path d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z"/><circle cx="12" cy="11" r="3"/><path d="M9 17c.5-1 1.5-1.5 3-1.5s2.5.5 3 1.5"/></svg>;
+    if (action.includes('Tratamientos')) return <svg {...common}><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></svg>;
+    if (action.includes('Financiero')) return <svg {...common}><line x1="12" y1="2" x2="12" y2="22"/><path d="M17 7.5c0-1.5-1.5-2.5-4-2.5s-4 1-4 2.5 1.5 2.5 4 2.5 4 1 4 2.5-1.5 2.5-4 2.5-4-1-4-2.5"/></svg>;
     return <svg {...common}><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/></svg>;
   };
 
@@ -42,6 +37,7 @@ const StatIcon = ({ type }) => {
   if (type === 'calendar') return <svg {...common}><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>;
   if (type === 'trend-up') return <svg {...common}><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>;
   if (type === 'trend-down') return <svg {...common}><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>;
+  if (type === 'users') return <svg {...common}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>;
   return <svg {...common}><path d="M12 1v22"/><path d="M17 5H9a3 3 0 0 0 0 6h6a3 3 0 0 1 0 6H7"/></svg>;
 };
 
@@ -49,60 +45,9 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const [mode, setMode] = useState('hoy'); // 'hoy' | 'rango' | 'acumulado'
   const [upcomingMode, setUpcomingMode] = useState('total'); // 'total' | 'manana' | 'proximo-mes'
-  const [isCajaModalOpen, setIsCajaModalOpen] = useState(false);
-  const now = new Date();
-  const [currentAnio] = useState(now.getFullYear());
-  const [selectedMes, setSelectedMes] = useState(now.getMonth() + 1);
   const queryClient = useQueryClient();
-  const [isQuickEgresoOpen, setIsQuickEgresoOpen] = useState(false);
-  const [quickMonto, setQuickMonto] = useState('');
-  const [quickDescripcion, setQuickDescripcion] = useState('');
-  const [quickMetodo, setQuickMetodo] = useState('efectivo');
-  const [isSubmittingQuick, setIsSubmittingQuick] = useState(false);
-
-  const sedeActiva = useAuthStore((s) => s.sedeActiva);
-
-  const { data: cajaData } = useQuery({
-    queryKey: ['caja-mensual-dashboard', sedeActiva, currentAnio, selectedMes],
-    queryFn: () => fetchCajaMensual({ anio: currentAnio, mes: selectedMes, sede_id: sedeActiva }),
-    staleTime: 1000 * 60 * 2
-  });
-
-  // Fallback: if no caja record exists for the month, compute efectivo from movimientos
-  const { data: movimientosForMonth = [] } = useQuery({
-    queryKey: ['caja-mensual-fallback', sedeActiva, currentAnio, selectedMes],
-    queryFn: async () => {
-      const month = String(selectedMes).padStart(2, '0');
-      const desde = `${currentAnio}-${month}-01`;
-      const lastDay = new Date(currentAnio, selectedMes, 0).getDate();
-      const hasta = `${currentAnio}-${month}-${String(lastDay).padStart(2, '0')}`;
-      const params = { desde, hasta };
-      if (sedeActiva !== null && typeof sedeActiva !== 'undefined') params.sede_id = sedeActiva;
-      const rows = await fetchMovimientosFinanzas(params);
-      return Array.isArray(rows) ? rows : [];
-    },
-    enabled: !cajaData,
-    staleTime: 1000 * 30
-  });
-
-  const cajaFallbackSaldo = (() => {
-    if (!movimientosForMonth || movimientosForMonth.length === 0) return null;
-    // counting rule: include movimientos with metodo_pago containing 'deposito' or equal 'efectivo'
-    let totalIngresos = 0;
-    let totalEgresos = 0;
-    movimientosForMonth.forEach((mv) => {
-      const metodo = String(mv.metodo_pago || '').toLowerCase();
-      if (!(metodo.includes('deposito') || metodo === 'efectivo')) return; // ignore non-cash methods
-      const monto = Number(mv.monto || 0);
-      if (String(mv.tipo) === 'ingreso') totalIngresos += monto;
-      else if (String(mv.tipo) === 'egreso') totalEgresos += monto;
-    });
-    return Number((totalIngresos - totalEgresos).toFixed(2));
-  })();
 
   // inline edit removed; keep code simple
-
-  const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
   const today = (() => {
     const d = new Date();
     const y = d.getFullYear();
@@ -153,11 +98,6 @@ export default function DashboardPage() {
 
   const dashboardSummary = [
     {
-      id: 'caja-mensual',
-      title: 'Caja Mensual',
-      value: currency.format((cajaData && (cajaData.saldo_final !== null && cajaData.saldo_final !== undefined)) ? cajaData.saldo_final : (cajaFallbackSaldo !== null ? cajaFallbackSaldo : 0))
-    },
-    {
       id: 'citas-hoy',
       title: 'Citas de Hoy',
       value: data?.summary?.citasHoy ?? 0
@@ -168,14 +108,9 @@ export default function DashboardPage() {
       value: currency.format(data?.summary?.totalIngresos ?? 0)
     },
     {
-      id: 'total-egresos',
-      title: 'Total Egresos',
-      value: currency.format(data?.summary?.totalEgresos ?? 0)
-    },
-    {
-      id: 'balance',
-      title: 'Balance',
-      value: currency.format(data?.summary?.balance ?? 0)
+      id: 'total-doctores',
+      title: 'Doctores Activos',
+      value: data?.summary?.totalDoctoresActivos ?? 0
     }
   ];
 
@@ -273,14 +208,13 @@ export default function DashboardPage() {
 
       <div className="summary-grid">
         {isLoading
-          ? [1, 2, 3, 4].map((item) => (
+          ? [1, 2, 3].map((item) => (
               <article key={item} className="stat-card">
                 <LoadingState lines={2} />
               </article>
             ))
           : (() => {
-              const others = dashboardSummary.filter((it) => it.id !== 'caja-mensual');
-              const firstFour = others.slice(0, 4);
+              const firstFour = dashboardSummary.slice(0, 4);
               return firstFour.map((item) => (
                 <article key={item.id} className="stat-card">
                   <div>
@@ -295,68 +229,6 @@ export default function DashboardPage() {
             })()}
       </div>
 
-      {/* Full width Caja Mensual card below the four summary cards */}
-      <div className="caja-full">
-        <article className="stat-card stat-card--clickable caja-full__card" style={{ cursor: 'pointer' }}>
-          <div className="caja-full__header">
-            <p style={{ fontWeight: 700, fontSize: '0.85rem' }} className="stat-card__title">Efectivo Mensual</p>
-          </div>
-
-          <div className="caja-full__selector-row">
-            <select className="stat-card__month-select ui-btn ui-btn--secondary stat-card__small-btn" value={selectedMes} onChange={(e) => setSelectedMes(Number(e.target.value))}>
-              {MONTHS.map((mName, idx) => (
-                <option key={mName} value={idx + 1}>{mName}</option>
-              ))}
-            </select>
-            <span style={{ marginLeft: 12, fontWeight: 700, color: '#1d3354' }}>{currentAnio}</span>
-          </div>
-
-          <div className="caja-full__body">
-            <div className="caja-full__totalBlock">
-              <div style={{ fontSize: 12, color: '#53657f', fontWeight: 700 }}>Total Efectivo disponible</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <p className="stat-card__value" style={{ margin: 0 }}>{currency.format(cajaData?.saldo_final ?? 0)}</p>
-                  <button
-                    type="button"
-                    className="stat-card__small-btn"
-                    aria-label="Registrar egreso rápido"
-                    title="Registrar egreso rápido"
-                    onClick={() => setIsQuickEgresoOpen((v) => !v)}
-                    style={{ padding: '6px 8px' }}
-                  >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18" aria-hidden="true">
-                      <path d="M17 1l4 4-4 4" />
-                      <path d="M3 11V9a4 4 0 0 1 4-4h14" />
-                      <path d="M7 23l-4-4 4-4" />
-                      <path d="M21 13v2a4 4 0 0 1-4 4H3" />
-                    </svg>
-                  </button>
-                </div>
-                {/* Quick egreso opens modal (handled below) */}
-            </div>
-
-            <div className="caja-full__stats">
-              <div className="caja-full__stat">
-                <div className="caja-full__label">Efectivo Inicial</div>
-                <div className="caja-full__amount">{currency.format(cajaData?.saldo_inicial ?? 0)}</div>
-              </div>
-              <div className="caja-full__stat">
-                <div className="caja-full__label">Ingresos Totales</div>
-                <div className="caja-full__amount caja-full__amount--positive">{currency.format(cajaData?.total_ingresos ?? 0)}</div>
-              </div>
-              <div className="caja-full__stat">
-                <div className="caja-full__label">Egresos Totales</div>
-                <div className="caja-full__amount caja-full__amount--negative">{currency.format(cajaData?.total_egresos ?? 0)}</div>
-              </div>
-            </div>
-
-            <div className="caja-full__actions">
-              <Button variant="secondary" onClick={() => setIsCajaModalOpen(true)} className="stat-card__small-btn">Editar saldo</Button>
-            </div>
-          </div>
-        </article>
-      </div>
-
       <div className="quick-access">
         <h2>Accesos Rápidos</h2>
         <div className="quick-access__buttons">
@@ -365,10 +237,7 @@ export default function DashboardPage() {
               key={action}
               type="button"
               className={`quick-btn quick-btn--${index + 1}`}
-                onClick={() => {
-                  if (action === 'Caja Mensual') return setIsCajaModalOpen(true);
-                  return navigate(quickActionRoutes[action] || '/dashboard');
-                }}
+                onClick={() => navigate(quickActionRoutes[action] || '/dashboard')}
             >
               <span className="quick-btn__icon"><QuickIcon action={action} /></span>
               <span className="quick-btn__label">{action}</span>
@@ -376,79 +245,6 @@ export default function DashboardPage() {
           ))}
         </div>
       </div>
-
-        {isCajaModalOpen ? (
-          <div className="modal-overlay" onClick={() => setIsCajaModalOpen(false)}>
-              <div className="modal-content modal-content--large" onClick={(e) => e.stopPropagation()}>
-              <button type="button" className="modal-close" onClick={() => setIsCajaModalOpen(false)}>✕</button>
-              <CajaMensualPage onClose={() => setIsCajaModalOpen(false)} initialAnio={currentAnio} initialMes={selectedMes} />
-            </div>
-          </div>
-        ) : null}
-
-        {isQuickEgresoOpen ? (
-          <div className="modal-overlay" onClick={() => { if (!isSubmittingQuick) setIsQuickEgresoOpen(false); }}>
-            <div className="modal-content modal-content--spacious" style={{ maxWidth: 720 }} onClick={(e) => e.stopPropagation()}>
-              <div className="modal-header">
-                <h2>Registrar Egreso Rápido</h2>
-                <button type="button" className="modal-close" onClick={() => { if (!isSubmittingQuick) setIsQuickEgresoOpen(false); }}>✕</button>
-              </div>
-              <div style={{ display: 'grid', gap: 12, padding: '0.5rem 0 0 0' }}>
-                <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }} className="ui-field">
-                  <span className="ui-field__label">Monto</span>
-                  <input type="number" min="0" step="0.01" placeholder="Monto" value={quickMonto} onChange={(e) => setQuickMonto(e.target.value)} className="ui-input" />
-                </label>
-                <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }} className="ui-field">
-                  <span className="ui-field__label">Descripción (opcional)</span>
-                  <input type="text" placeholder="Descripción" value={quickDescripcion} onChange={(e) => setQuickDescripcion(e.target.value)} className="ui-input" />
-                </label>
-                <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }} className="ui-field">
-                  <span className="ui-field__label">Método</span>
-                  <select value={quickMetodo} onChange={(e) => setQuickMetodo(e.target.value)} className="ui-input">
-                    <option value="efectivo">Efectivo</option>
-                    <option value="deposito">Depósito bancario</option>
-                  </select>
-                </label>
-                <div className="modal-footer">
-                  <button type="button" className="btn-modal-cancel" onClick={() => { if (!isSubmittingQuick) setIsQuickEgresoOpen(false); }} disabled={isSubmittingQuick}>Cancelar</button>
-                  <button
-                    type="button"
-                    className="btn-modal-save"
-                    onClick={async () => {
-                      const montoNum = Number(Number(quickMonto || 0));
-                      if (!montoNum || montoNum <= 0) return alert('Ingresa un monto válido');
-                      try {
-                        setIsSubmittingQuick(true);
-                        const payload = {
-                          tipo: 'egreso',
-                          monto: Number(montoNum.toFixed(2)),
-                          descripcion: quickDescripcion || null,
-                          metodo_pago: quickMetodo,
-                          fecha: today
-                        };
-                        if (sedeActiva) payload.sede_id = sedeActiva;
-                        await createMovimientoFinanzas(payload);
-                        queryClient.invalidateQueries({ queryKey: ['caja-mensual-dashboard', sedeActiva, currentAnio, selectedMes] });
-                        queryClient.invalidateQueries({ queryKey: ['egresos', sedeActiva] });
-                        queryClient.invalidateQueries({ queryKey: ['dashboard-snapshot'] });
-                        setQuickMonto('');
-                        setQuickDescripcion('');
-                        setQuickMetodo('efectivo');
-                        setIsQuickEgresoOpen(false);
-                      } catch (err) {
-                        console.error('Error creando egreso rápido:', err);
-                        alert('No se pudo registrar el egreso.');
-                      } finally {
-                        setIsSubmittingQuick(false);
-                      }
-                    }}
-                    disabled={isSubmittingQuick}
-                  >{isSubmittingQuick ? 'Registrando...' : 'Registrar'}</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        ) : null}
 
       <div className="dashboard-panels">
         <article className="panel-card">

@@ -193,11 +193,8 @@ export default function CitasPage() {
       setIsModalOpen(false);
       setSelectedCita(null);
       queryClient.invalidateQueries({ queryKey: ['citas'] });
-      // Invalidate caja/dashboard related queries so totals refresh immediately
+      // Invalidate dashboard related queries so totals refresh immediately
       try {
-        queryClient.invalidateQueries({ queryKey: ['caja-mensual'] });
-        queryClient.invalidateQueries({ queryKey: ['caja-mensual-dashboard'] });
-        queryClient.invalidateQueries({ queryKey: ['caja-mensual-history'] });
         queryClient.invalidateQueries({ queryKey: ['dashboard-snapshot'] });
       } catch {
         // ignore

@@ -6,10 +6,7 @@ import PacientesPage from '../../pages/pacientes/PacientesPage';
 import CitasPage from '../../pages/citas/CitasPage';
 import DoctoresPage from '../../pages/doctores/DoctoresPage';
 import TratamientosPage from '../../pages/tratamientos/TratamientosPage';
-import IngresosPage from '../../pages/finanzas/IngresosPage';
-import EgresosPage from '../../pages/finanzas/EgresosPage';
 import FinancesPage from '../../pages/finanzas/FinancesPage';
-import InventarioPage from '../../pages/inventario/InventarioPage';
 import { useAuthStore } from '../../store/authStore';
 
 function PrivateRoute() {
@@ -56,10 +53,7 @@ export default function AppRouter() {
           <Route path="/citas" element={<CitasPage />} />
           <Route path="/doctores" element={<DoctoresPage />} />
           <Route path="/tratamientos" element={<TratamientosPage />} />
-          <Route path="/ingresos" element={<IngresosPage />} />
-          <Route path="/egresos" element={<EgresosPage />} />
           <Route path="/financiero" element={<FinancesPage />} />
-          <Route path="/inventario" element={<InventarioPage />} />
         </Route>
       </Route>
 
