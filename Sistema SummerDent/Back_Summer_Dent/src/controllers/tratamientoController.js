@@ -164,7 +164,7 @@ export const actualizarTratamientoController = async (req, res) => {
 
     const supabaseUser = getSupabaseClientWithToken(token);
     const { id } = req.params;
-    const { area, nombre, precio, descripcion } = req.body;
+    const { area, nombre, precio, descripcion, sede_id } = req.body;
 
     if (!esIdValido(id)) return res.status(400).json({ error: 'El id debe ser un número entero positivo' });
 
@@ -172,7 +172,7 @@ export const actualizarTratamientoController = async (req, res) => {
       return res.status(400).json({ error: 'El cuerpo de la solicitud debe ser un objeto JSON valido' });
     }
 
-    const camposPermitidos = ['area', 'nombre', 'precio', 'descripcion'];
+    const camposPermitidos = ['area', 'nombre', 'precio', 'descripcion', 'sede_id'];
     const camposRecibidos = Object.keys(req.body || {});
 
     if (camposRecibidos.length === 0) {
@@ -188,6 +188,7 @@ export const actualizarTratamientoController = async (req, res) => {
     if (nombre !== undefined && !esNombreTratamientoValido(String(nombre))) return res.status(400).json({ error: 'El nombre debe contener al menos 5 letras, puede incluir números y tener hasta 64 caracteres' });
     if (precio !== undefined && !esPrecioValido(precio)) return res.status(400).json({ error: 'El precio debe ser un número positivo (puede tener decimales)' });
     if (descripcion !== undefined && !esDescripcionValida(descripcion)) return res.status(400).json({ error: 'La descripción no debe exceder 300 caracteres' });
+    if (sede_id !== undefined && !esIdValido(sede_id)) return res.status(400).json({ error: 'El ID de la sede es inválido' });
 
     const { data: existing, error: fetchErr } = await supabaseUser.from('tratamiento').select('id').eq('id', id).maybeSingle();
     if (fetchErr) return res.status(500).json({ error: fetchErr.message || fetchErr });
@@ -198,6 +199,7 @@ export const actualizarTratamientoController = async (req, res) => {
     if (nombre !== undefined) updates.nombre = nombre ? String(nombre).trim() : null;
     if (precio !== undefined) updates.precio = precio;
     if (descripcion !== undefined) updates.descripcion = descripcion ? String(descripcion).trim() : null;
+    if (sede_id !== undefined) updates.sede_id = sede_id;
 
     if (Object.keys(updates).length === 0) {
       return res.status(400).json({ error: 'No hay campos válidos para actualizar' });

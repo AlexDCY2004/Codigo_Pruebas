@@ -175,7 +175,7 @@ export const actualizarDoctorController = async (req, res) => {
         const supabaseUser = getSupabaseClientWithToken(token);
 
         const { id } = req.params;
-        const { nombre, telefono, correo, especialidad, estado } = req.body;
+        const { nombre, telefono, correo, especialidad, estado, sede_id } = req.body;
 
         if (!esIdValido(id)) {
             return res.status(400).json({ error: 'El id debe ser un numero entero positivo' });
@@ -185,7 +185,7 @@ export const actualizarDoctorController = async (req, res) => {
             return res.status(400).json({ error: 'El cuerpo de la solicitud debe ser un objeto JSON valido' });
         }
 
-        const camposPermitidos = ['nombre', 'telefono', 'correo', 'especialidad', 'estado'];
+        const camposPermitidos = ['nombre', 'telefono', 'correo', 'especialidad', 'estado', 'sede_id'];
         const camposRecibidos = Object.keys(req.body || {});
 
         if (camposRecibidos.length === 0) {

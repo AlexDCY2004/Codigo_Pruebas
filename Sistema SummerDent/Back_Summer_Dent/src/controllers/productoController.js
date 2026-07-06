@@ -112,15 +112,15 @@ export const actualizarProductoController = async (req, res) => {
         const supabaseUser = getSupabaseClientWithToken(token);
 
         const { id } = req.params;
-        const { nombre, descripcion, categoria, precio } = req.body;
+        const { nombre, descripcion, categoria, precio, sede_id } = req.body;
 
         const { data: existing, error: fetchErr } = await supabaseUser.from('producto').select('id').eq('id', id).maybeSingle();
         if (fetchErr) return res.status(500).json({ error: fetchErr.message || fetchErr });
         if (!existing) return res.status(404).json({ error: 'Producto no encontrado' });
 
         // Para actualización requerimos todos los campos (evitamos updates parciales)
-        if (nombre === undefined || descripcion === undefined || categoria === undefined || precio === undefined) {
-            return res.status(400).json({ error: 'Nombre, descripción, categoría y precio son obligatorios para actualizar el producto' });
+        if (nombre === undefined || descripcion === undefined || categoria === undefined || precio === undefined || sede_id === undefined) {
+            return res.status(400).json({ error: 'Nombre, descripción, categoría, precio y sede_id son obligatorios para actualizar el producto' });
         }
 
         if (!String(nombre).trim()) return res.status(400).json({ error: 'El nombre del producto no puede estar vacío' });
@@ -128,6 +128,7 @@ export const actualizarProductoController = async (req, res) => {
         if (!String(descripcion).trim()) return res.status(400).json({ error: 'La descripción no puede estar vacía' });
         if (!String(categoria).trim()) return res.status(400).json({ error: 'La categoría no puede estar vacía' });
         if (!esPrecioValido(precio)) return res.status(400).json({ error: 'precio inválido (usa formato 0 o 0.00)' });
+        if (!esIdValido(sede_id)) return res.status(400).json({ error: 'El ID de la sede es inválido' });
 
         const updates = {};
         if (nombre !== undefined) updates.nombre = String(nombre).trim();

@@ -210,7 +210,7 @@ export const actualizarPacienteController = async (req, res) => {
     const supabaseUser = getSupabaseClientWithToken(token);
     const perfil = await getPerfilFromToken(token);
     const { id } = req.params;
-    const { id_cedula, nombre, apellido, fecha_nacimiento, telefono, correo, direccion } = req.body;
+    const { id_cedula, nombre, apellido, fecha_nacimiento, telefono, correo, direccion, sede_id } = req.body;
 
     if (!esCedulaValida(id)) return res.status(400).json({ error: 'El id debe ser una cédula ecuatoriana válida de 10 dígitos' });
 
@@ -218,7 +218,7 @@ export const actualizarPacienteController = async (req, res) => {
       return res.status(400).json({ error: 'El cuerpo de la solicitud debe ser un objeto JSON valido' });
     }
 
-    const camposPermitidos = ['id_cedula', 'nombre', 'apellido', 'fecha_nacimiento', 'telefono', 'correo', 'direccion'];
+    const camposPermitidos = ['id_cedula', 'nombre', 'apellido', 'fecha_nacimiento', 'telefono', 'correo', 'direccion', 'sede_id'];
     if (perfil && perfil.rol === 'superadmin') {
       camposPermitidos.push('sede_id');
     }
@@ -263,6 +263,7 @@ export const actualizarPacienteController = async (req, res) => {
     if (telefono !== undefined && !esTelefonoValido(telefono)) return res.status(400).json({ error: 'El teléfono debe contener solo dígitos, tener exactamente 10 caracteres y no puede tener más de 3 dígitos iguales consecutivos' });
     if (correo !== undefined && !esCorreoValido(correo)) return res.status(400).json({ error: 'El correo debe tener formato válido y entre 5 y 64 caracteres' });
     if (direccion !== undefined && direccion !== null && String(direccion).trim() && !esTextoValido(String(direccion), 1, 255)) return res.status(400).json({ error: 'La dirección no debe exceder 255 caracteres' });
+    if (sede_id !== undefined && sede_id !== null && !esIdValido(sede_id)) return res.status(400).json({ error: 'El ID de la sede es inválido' });
 
     const correoLimpioUpdate = correo !== undefined && correo !== null && String(correo).trim() ? String(correo).trim().toLowerCase() : '';
     if (correoLimpioUpdate) {

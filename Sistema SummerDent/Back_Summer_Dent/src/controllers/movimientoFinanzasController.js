@@ -182,7 +182,7 @@ export const actualizarMovimientoController = async (req, res) => {
 
     if (typeof req.body !== 'object' || req.body === null || Array.isArray(req.body)) return res.status(400).json({ error: 'El cuerpo de la solicitud debe ser un objeto JSON valido' });
 
-    const camposPermitidos = ['id_doctor', 'monto', 'descripcion', 'fecha', 'metodo_pago'];
+    const camposPermitidos = ['id_doctor', 'monto', 'descripcion', 'fecha', 'metodo_pago', 'sede_id'];
     const recibidos = Object.keys(req.body || {});
     if (recibidos.length === 0) return res.status(400).json({ error: 'Debes enviar al menos un campo para actualizar' });
     const noPermitidos = recibidos.filter((c) => !camposPermitidos.includes(c));
@@ -193,7 +193,7 @@ export const actualizarMovimientoController = async (req, res) => {
     if (!existing) return res.status(404).json({ error: 'Movimiento no encontrado' });
 
     const updates = {};
-    const { id_doctor, monto, descripcion, fecha, metodo_pago } = req.body;
+    const { id_doctor, monto, descripcion, fecha, metodo_pago, sede_id } = req.body;
     if (id_doctor !== undefined) {
       if (id_doctor !== null && !esEnteroPositivo(id_doctor)) return res.status(400).json({ error: 'id_doctor inválido' });
       updates.id_doctor = id_doctor !== null ? Number(id_doctor) : null;
