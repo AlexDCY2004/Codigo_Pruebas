@@ -1,0 +1,277 @@
+.tratamientos-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.tratamientos-table thead {
+  background: #f8f9fa;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.tratamientos-table th {
+  padding: 1rem;
+  text-align: left;
+  font-weight: 600;
+  color: #1d3354;
+  white-space: nowrap;
+}
+
+.tratamientos-table tbody tr {
+  border-bottom: 1px solid #e9ecef;
+}
+
+.tratamientos-table tbody tr:hover {
+  background-color: #f8fbff;
+}
+
+.tratamientos-table td {
+  padding: 1rem;
+  color: #23324a;
+  vertical-align: top;
+}
+
+.tratamiento-area {
+  display: inline-flex;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  background: #eef4ff;
+  color: #2f5bea;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.tratamiento-descripcion {
+  max-width: 340px;
+  color: #52627a;
+}
+
+.tratamientos-mobile-list {
+  display: none;
+}
+
+.tratamiento-form {
+  padding: 1.5rem;
+}
+
+.tratamiento-form--readonly {
+  padding-top: 1rem;
+}
+
+.tratamiento-read-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.tratamiento-read-label {
+  flex: 0 0 32%;
+  color: #1a2fd1;
+  font-weight: 700;
+}
+
+.tratamiento-read-value {
+  flex: 1;
+  color: #1f2937;
+  word-break: break-word;
+}
+
+.tratamiento-form--readonly .modal-footer {
+  justify-content: flex-end;
+  margin-top: 1rem;
+}
+
+.tratamiento-form .form-group {
+  margin-bottom: 1rem;
+}
+
+.tratamiento-form label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  color: #1d3354;
+}
+
+.tratamiento-form input,
+.tratamiento-form select {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #dce5f0;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  color: #23324a;
+  background: #fff;
+}
+
+.tratamiento-form input:focus,
+.tratamiento-form select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+}
+
+.tratamiento-form .input-error {
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.04);
+}
+
+@media (max-width: 1100px) {
+  .tratamientos-table {
+    font-size: 0.88rem;
+  }
+
+  .tratamientos-table th,
+  .tratamientos-table td {
+    padding: 0.75rem;
+  }
+
+  .tratamiento-descripcion {
+    max-width: 220px;
+  }
+
+  .tratamiento-read-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .tratamiento-read-label,
+  .tratamiento-read-value {
+    flex: 1;
+  }
+}
+
+@media (max-width: 720px) {
+  .tratamientos-table {
+    display: none;
+  }
+
+  .tratamientos-mobile-list {
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .tratamientos-mobile-card {
+    background: #fff;
+    border: 1px solid #e6e0cf;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  }
+
+  .tratamientos-mobile-card__summary {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.65rem;
+    border: none;
+    background: linear-gradient(180deg, #fffdf7 0%, #fff 100%);
+    padding: 0.95rem 1rem;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .tratamientos-mobile-card__toggle {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 999px;
+    background: rgba(216, 163, 26, 0.12);
+    color: #b07c00;
+  }
+
+  .tratamientos-mobile-card__summary-main {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  .tratamientos-mobile-card__treatment-label {
+    color: #6b6b6b;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 700;
+  }
+
+  .tratamientos-mobile-card__treatment-name {
+    color: #1a1a1a;
+    font-size: 0.98rem;
+    line-height: 1.25;
+  }
+
+  .tratamientos-mobile-card__treatment-name strong {
+    display: block;
+    font-weight: 700;
+    word-break: break-word;
+  }
+
+  .tratamientos-mobile-card__summary-actions {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.25rem;
+    margin-left: auto;
+  }
+
+  .tratamientos-mobile-card__details {
+    border-top: 2px solid rgba(34, 51, 84, 0.22);
+    padding: 0.9rem 1rem 1rem;
+    background: #fff;
+    display: grid;
+    gap: 0.6rem;
+  }
+
+  .tratamientos-mobile-card__row {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.2rem;
+    padding-bottom: 0.7rem;
+    margin-bottom: 0.15rem;
+    border-bottom: 2px solid rgba(34, 51, 84, 0.28);
+  }
+
+  .tratamientos-mobile-card__row:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: 0;
+  }
+
+  .tratamientos-mobile-card__label {
+    color: #6b6b6b;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 700;
+  }
+
+  .tratamientos-mobile-card__value {
+    color: #232323;
+    font-size: 0.95rem;
+    word-break: break-word;
+  }
+
+  .table-actions--mobile {
+    padding: 0;
+    gap: 0.35rem;
+  }
+
+  .table-actions--mobile .action-btn {
+    width: 36px;
+    height: 36px;
+  }
+
+  .table-actions--mobile .action-btn svg {
+    width: 18px;
+    height: 18px;
+  }
+}

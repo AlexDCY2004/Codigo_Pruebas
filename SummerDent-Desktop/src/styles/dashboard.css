@@ -1,0 +1,611 @@
+.dashboard-grid {
+  display: grid;
+  gap: 1.35rem;
+}
+
+.dashboard-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.dashboard-controls {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.segmented-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* Segmented mode buttons */
+.seg-btn {
+  border: 1px solid rgba(34, 51, 84, 0.08);
+  background: transparent;
+  color: #23324a;
+  padding: 0.45rem 0.85rem;
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 180ms ease;
+}
+
+/* Make selects styled like segmented buttons when using the seg-btn class */
+select.seg-btn {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  display: inline-block;
+  min-width: 160px;
+  text-align: center;
+  padding: 0.45rem 0.85rem;
+  line-height: 1.2;
+  color: #162b49; /* default text color: dark */
+  background: #fff; /* default background for closed select */
+  border: 1px solid rgba(34, 51, 84, 0.08);
+  border-radius: 10px;
+}
+
+select.seg-btn option {
+  font-weight: 600;
+  text-align: center;
+  color: #162b49; /* ensure dropdown options show dark text */
+  background: #fff;
+}
+
+select.seg-btn option:checked,
+select.seg-btn option:checked:focus {
+  color: #fff;
+  background: #2e66d6;
+}
+
+/* active variant for when we want the select to look like the blue segmented button */
+select.seg-btn.is-active,
+.seg-btn--sede.is-active {
+  background: linear-gradient(180deg,#3a7ce5 0%,#2e66d6 100%);
+  color: #fff;
+  box-shadow: 0 6px 18px rgba(16,24,40,0.08);
+}
+
+/* hide default arrow on most browsers and allow custom spacing */
+select.seg-btn::-ms-expand { display: none; }
+
+.seg-btn:not(.is-active):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 1px 4px rgba(16,24,40,0.04);
+}
+
+.seg-btn.is-active {
+  color: #fff;
+  box-shadow: 0 6px 18px rgba(16,24,40,0.08);
+}
+
+.seg-btn--hoy.is-active { background: linear-gradient(180deg,#3a7ce5 0%,#2e66d6 100%); }
+.seg-btn--rango.is-active { background: linear-gradient(180deg,#3a7ce5 0%,#2e66d6 100%); }
+.seg-btn--acumulado.is-active { background: linear-gradient(180deg,#3a7ce5 0%,#2e66d6 100%); }
+
+.dashboard-range-picker {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.75rem;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid rgba(34, 51, 84, 0.12);
+  border-radius: 14px;
+  background: linear-gradient(180deg, #ffffff 0%, #f5f8ff 100%);
+  box-shadow: 0 8px 22px rgba(16, 24, 40, 0.06);
+}
+
+.dashboard-range-field {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 160px;
+}
+
+.dashboard-range-field span {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #53657f;
+  letter-spacing: 0.02em;
+}
+
+.dashboard-date-input {
+  appearance: none;
+  border: 1px solid rgba(58, 124, 229, 0.24);
+  border-radius: 12px;
+  background: #fff;
+  color: #162b49;
+  padding: 0.62rem 0.8rem;
+  font: inherit;
+  font-weight: 600;
+  min-height: 42px;
+  min-width: 150px;
+  box-shadow: inset 0 1px 2px rgba(16, 24, 40, 0.04);
+  transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+.dashboard-date-input:hover {
+  border-color: rgba(58, 124, 229, 0.42);
+}
+
+.dashboard-date-input:focus {
+  outline: none;
+  border-color: #3a7ce5;
+  box-shadow: 0 0 0 4px rgba(58, 124, 229, 0.14);
+}
+
+.dashboard-date-input::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.8;
+}
+
+.dashboard-date-input::-moz-focus-inner {
+  border: 0;
+}
+
+/* Slight tint for stat cards depending on selected mode */
+.mode-hoy .stat-card { background: linear-gradient(180deg,#f4f8ff 0%, #f8fbff 100%); border-color: rgba(47,115,232,0.12); }
+.mode-rango .stat-card { background: linear-gradient(180deg,#f4f8ff 0%, #f8fbff 100%); border-color: rgba(47,115,232,0.12); }
+.mode-acumulado .stat-card { background: linear-gradient(180deg,#f4f8ff 0%, #f8fbff 100%); border-color: rgba(47,115,232,0.12); }
+
+.dashboard-title h1 {
+  margin: 0;
+  font-size: 1.6rem;/**/
+  color: #162b49;
+  font-weight: 700;
+}
+
+.dashboard-title p {
+  margin-top: 0.35rem;
+  color: #2e2d2d;
+  font-size: 0.9rem;/**/
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+
+.stat-card {
+  border: 1px solid #777777;
+  border-radius: 14px;
+  background: #f8fafd;
+  padding: 0.95rem 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.stat-card__title {
+  margin: 0;
+  color: #2e2d2d;
+  font-size: 0.88rem;/**/
+}
+
+.stat-card__value {
+  margin: 0.55rem 0 0;
+  color: #162b49;
+  font-size: 1.5rem;/**/
+  font-weight: 800;
+  line-height: 1;
+}
+
+.stat-card__icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+}
+
+.stat-card--clickable .stat-card__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  align-items: flex-start;
+}
+
+.stat-card__month {
+  font-size: 0.82rem;
+  color: #53657f;
+  font-weight: 700;
+}
+
+.stat-card__small-btn {
+  background: transparent;
+  border: 1px solid rgba(34,51,84,0.08);
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.stat-card__actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.stat-card__small-input {
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(34,51,84,0.08);
+  min-width: 110px;
+  font-weight: 700;
+}
+
+.stat-card__icon--citas-hoy {
+  background: #e6eefc;
+  color: #2f73e8;
+}
+
+.stat-card__icon--balance {
+  background: #faecee;
+  color: #e11616;
+}
+
+.stat-card__icon--total-ingresos {
+  background: #e6f7ec;
+  color: #16a34a;
+}
+
+.stat-card__icon--total-doctores {
+  background: #ede7f6;
+  color: #7c3aed;
+}
+
+.quick-access h2 {
+  margin: 0;
+  font-size: 1.3rem;/**/
+  color: #162b49;
+}
+
+.quick-access__buttons {
+  margin-top: 0.95rem;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.quick-btn {
+  border: none;
+  border-radius: 12px;
+  height: 52px;
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.8rem;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+.quick-btn--1 {
+  background: #3a7ce5;
+}
+
+.quick-btn--2 {
+  background: #0cc752;
+}
+
+.quick-btn--3 {
+  background: linear-gradient(90deg, #9b45ec 0%, #b445f6 100%);
+}
+
+.quick-btn--4 {
+  background: #ff6a00;
+}
+
+.quick-btn--5 {
+  background: linear-gradient(90deg, #06b6d4 0%, #0891b2 100%);
+}
+
+.quick-btn__icon {
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  align-items: center;
+  justify-content: center;
+}
+
+.quick-btn__label {
+  flex: 0 0 auto;
+}
+
+.dashboard-panels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.panel-card {
+  border: 1px solid #777777;
+  border-radius: 14px;
+  padding: 1.3rem;
+  background: #fbfcfe;
+}
+
+.panel-card__header--appointments {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.panel-card__header--appointments h3 {
+  flex: 0 0 auto;
+}
+
+.panel-card__header--appointments .dashboard-appointments-segmented {
+  margin-top: 0;
+  margin-left: auto;
+  justify-content: flex-end;
+}
+
+.panel-card h3 {
+  margin: 0;
+  color: #162b49;
+  font-size: 1.3rem;/**/
+}
+
+.dashboard-panels > .panel-card > h3 {
+  padding-bottom: 0.65rem;
+  margin-bottom: 0.9rem;
+  border-bottom: 2px solid rgba(34, 51, 84, 0.28);
+}
+
+.panel-card__header--appointments {
+  padding-bottom: 0.65rem;
+  margin-bottom: 0.9rem;
+  border-bottom: 2px solid rgba(34, 51, 84, 0.28);
+}
+
+.appointments-list {
+  margin-top: 0;
+  display: grid;
+  gap: 0.8rem;
+}
+
+.dashboard-appointments-segmented {
+  margin-top: 0;
+}
+
+.dashboard-empty {
+  margin: 0;
+  color: #647b9b;
+  font-size: 0.85rem;/**/
+}
+
+.appointment-item {
+  border-radius: 10px;
+  background: #edf1f7;
+  padding: 0.9rem 0.9rem;
+  display: flex;
+  justify-content: space-between;
+  gap: 0.7rem;
+  align-items: center;
+}
+
+.appointment-id {
+  margin: 0;
+  color: #2d3f5d;
+  font-size: 0.8rem;/**/
+}
+
+.appointment-item span {
+  color: #647b9b;
+  font-size: 0.85rem;/**/
+}
+
+.appointment-status {
+  border-radius: 8px;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.82rem;/**/
+  font-weight: 600;
+}
+
+.appointment-status--ok {
+  background: #cdefd9;
+  color: #2b8f57;
+}
+
+.appointment-status--pending {
+  background: #efe59f;
+  color: #997d20;
+}
+
+.appointment-item .appointment-status--today {
+  background: #f2dc4f;
+  color: #23324a;
+}
+
+.finance-list {
+  margin-top: 1rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.finance-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-radius: 10px;
+  padding: 0.95rem 1rem;
+}
+
+.finance-item span {
+  color: #2f4562;
+  font-size: 0.92rem;/**/
+}
+
+.finance-item strong {
+  font-size: 1rem;/**/
+}
+
+.finance-item--income {
+  background: #dfefe8;
+}
+
+.finance-item--income strong {
+  color: #1e9b4f;
+}
+
+.finance-item--expense {
+  background: #f6e9ea;
+}
+
+.finance-item--expense strong {
+  color: #d32e2e;
+}
+
+@media (max-width: 1200px) {
+  .summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .quick-access__buttons {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .dashboard-panels {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .dashboard-title h1 {
+    font-size: 1.45rem;/**/
+  }
+
+  .quick-access h2,
+  .panel-card h3 {
+    font-size: 1.2rem;/**/
+  }
+
+  .summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .quick-access__buttons {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .dashboard-range-picker {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .dashboard-range-field,
+  .dashboard-date-input {
+    min-width: 0;
+    width: 100%;
+  }
+
+  /* When the dashboard is in 'rango' mode, keep the date fields in one row */
+  .mode-rango .dashboard-range-picker {
+    flex-direction: row;
+    align-items: flex-end;
+    gap: 0.75rem;
+  }
+
+  .mode-rango .dashboard-range-field {
+    width: 50%;
+    min-width: 0;
+  }
+
+  /* Stack the topbar controls under the title on small screens */
+  .dashboard-topbar {
+    align-items: flex-start;
+  }
+
+  .dashboard-title {
+    width: 100%;
+  }
+
+  .panel-card__header--appointments {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .panel-card__header--appointments .dashboard-appointments-segmented {
+    width: 100%;
+    margin-left: 0;
+    justify-content: stretch;
+  }
+
+  .panel-card__header--appointments .dashboard-appointments-segmented .seg-btn {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .panel-card__header--appointments .dashboard-appointments-segmented .seg-btn:nth-child(1),
+  .panel-card__header--appointments .dashboard-appointments-segmented .seg-btn:nth-child(2) {
+    flex: 0 0 28%;
+    max-width: 28%;
+  }
+
+  .panel-card__header--appointments .dashboard-appointments-segmented .seg-btn:nth-child(3) {
+    flex: 1 1 0;
+    max-width: none;
+  }
+
+  .dashboard-controls {
+    margin-left: 0;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+
+
+    gap: 0.8rem;
+    margin-top: 0.8rem;
+  }
+
+  .segmented-buttons {
+    width: 100%;
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  /* Make each segmented button share available space equally on small screens */
+  .segmented-buttons .seg-btn {
+    flex: 1 1 0;
+    min-width: 0;
+    text-align: center;
+    padding-left: 0.6rem;
+    padding-right: 0.6rem;
+  }
+
+  /* Ensure title has space below it on small screens */
+  .dashboard-title {
+    margin-bottom: 0.5rem;
+  }
+
+  .stat-card__value {
+    font-size: 1.6rem;/**/
+  }
+
+  .appointment-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Ensure each stat card takes full width on very small screens */
+  .summary-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
