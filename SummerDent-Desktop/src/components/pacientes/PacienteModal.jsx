@@ -19,6 +19,23 @@ function ReadRow({ label, value }) {
   );
 }
 
+const validarCedulaEcuatoriana = (cedula) => {
+  const provincia = parseInt(cedula.substring(0, 2), 10);
+  if (provincia < 1 || provincia > 24) return false;
+  const tercerDigito = parseInt(cedula[2], 10);
+  if (tercerDigito < 0 || tercerDigito > 5) return false;
+  const coeficientes = [2, 1, 2, 1, 2, 1, 2, 1, 2];
+  let suma = 0;
+  for (let i = 0; i < 9; i++) {
+    let p = parseInt(cedula[i], 10) * coeficientes[i];
+    if (p >= 10) p -= 9;
+    suma += p;
+  }
+  const digitoVerificador = parseInt(cedula[9], 10);
+  const digitoCalculado = suma % 10 === 0 ? 0 : 10 - (suma % 10);
+  return digitoCalculado === digitoVerificador;
+};
+
 const computeAgeFromDate = (fecha) => {
   if (!fecha) return '-';
   try {
@@ -32,15 +49,18 @@ const computeAgeFromDate = (fecha) => {
   } catch { return '-'; }
 };
 
-export default function PacienteModal({ isOpen, onClose, onSubmit, initialData, isLoading, readOnly = false, isEditing = false, externalErrors = {}, onClearExternalError }) {
+export default function PacienteModal({ isOpen, onClose, onSubmit, initialData, isLoading, readOnly = false, isEditing = false, externalErrors = {}, onClearExternalError, onCheckCedula }) {
   const [formData, setFormData] = useState(() => getInitialFormData(initialData));
   const [errors, setErrors] = useState({});
+  const [isCedulaDuplicada, setIsCedulaDuplicada] = useState(false);
   const allErrors = { ...errors, ...externalErrors };
 
   const validateForm = () => {
     const newErrors = {};
     if (!formData.id_cedula?.trim()) newErrors.id_cedula = 'Cédula requerida';
     else if (formData.id_cedula.trim().length !== 10) newErrors.id_cedula = 'La cédula debe tener 10 dígitos';
+    else if (!validarCedulaEcuatoriana(formData.id_cedula.trim())) newErrors.id_cedula = 'Cédula ecuatoriana inválida';
+    else if (isCedulaDuplicada) newErrors.id_cedula = 'La cédula ya está registrada';
     if (!formData.nombre?.trim()) newErrors.nombre = 'Nombre requerido';
     if (!formData.apellido?.trim()) newErrors.apellido = 'Apellido requerido';
     if (!formData.fecha_nacimiento) newErrors.fecha_nacimiento = 'Fecha de nacimiento requerida';
@@ -75,6 +95,7 @@ export default function PacienteModal({ isOpen, onClose, onSubmit, initialData, 
     setFormData(prev => ({ ...prev, [name]: value }));
     if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' }));
     if (externalErrors[name]) onClearExternalError(name);
+    if (name === 'id_cedula') setIsCedulaDuplicada(false);
   };
 
   const handlePaste = (e) => {
@@ -86,13 +107,44 @@ export default function PacienteModal({ isOpen, onClose, onSubmit, initialData, 
       e.preventDefault();
       setFormData(prev => ({ ...prev, [name]: (String(prev[name] || '') + digits).slice(0, 10) }));
       if (externalErrors[name]) onClearExternalError(name);
+      if (name === 'id_cedula') setIsCedulaDuplicada(false);
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleCedulaBlur = async () => {
+    if (readOnly || isEditing || !onCheckCedula) return;
+    const cedula = formData.id_cedula?.trim();
+    if (cedula.length === 10) {
+      if (!validarCedulaEcuatoriana(cedula)) {
+        setErrors(prev => ({ ...prev, id_cedula: 'Cédula ecuatoriana inválida' }));
+        return;
+      }
+      if (externalErrors.id_cedula) onClearExternalError('id_cedula');
+      const exists = await onCheckCedula(cedula);
+      setIsCedulaDuplicada(exists);
+      if (exists) {
+        setErrors(prev => ({ ...prev, id_cedula: 'La cédula ya está registrada' }));
+      }
+    }
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (readOnly) return;
-    if (validateForm()) onSubmit(formData);
+    if (!validateForm()) return;
+    if (!isEditing && onCheckCedula && formData.id_cedula?.trim().length === 10) {
+      if (!validarCedulaEcuatoriana(formData.id_cedula.trim())) {
+        setErrors(prev => ({ ...prev, id_cedula: 'Cédula ecuatoriana inválida' }));
+        return;
+      }
+      const alreadyExists = await onCheckCedula(formData.id_cedula.trim());
+      if (alreadyExists) {
+        setIsCedulaDuplicada(true);
+        setErrors(prev => ({ ...prev, id_cedula: 'La cédula ya está registrada' }));
+        return;
+      }
+    }
+    onSubmit(formData);
   };
 
   if (!isOpen) return null;
@@ -118,7 +170,7 @@ export default function PacienteModal({ isOpen, onClose, onSubmit, initialData, 
                 {isEditing ? (
                   <input type="text" id="id_cedula" name="id_cedula" value={formData.id_cedula} onChange={handleChange} placeholder="1234567890" className={allErrors.id_cedula ? 'input-error' : ''} disabled />
                 ) : (
-                  <input type="text" id="id_cedula" name="id_cedula" value={formData.id_cedula} onChange={handleChange} onPaste={handlePaste} placeholder="1234567890" className={allErrors.id_cedula ? 'input-error' : ''} maxLength={10} inputMode="numeric" />
+                  <input type="text" id="id_cedula" name="id_cedula" value={formData.id_cedula} onChange={handleChange} onBlur={handleCedulaBlur} onPaste={handlePaste} placeholder="1234567890" className={allErrors.id_cedula ? 'input-error' : ''} maxLength={10} inputMode="numeric" />
                 )}
                 {allErrors.id_cedula && <span className="error-text">{allErrors.id_cedula}</span>}
               </div>

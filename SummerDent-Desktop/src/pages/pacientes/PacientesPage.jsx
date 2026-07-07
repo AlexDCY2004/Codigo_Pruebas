@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import ConfirmModal from '../../components/ui/ConfirmModal';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { fetchPacientes, createPaciente, updatePaciente, deletePaciente } from '../../services/pacientes';
+import { fetchPacientes, createPaciente, updatePaciente, deletePaciente, checkCedulaExists } from '../../services/pacientes';
 import PacientesTable from '../../components/pacientes/PacientesTable';
 import PacienteModal from '../../components/pacientes/PacienteModal';
 import ErrorState from '../../components/feedback/ErrorState';
@@ -50,6 +50,14 @@ export default function PacientesPage() {
 
   const handleClearFieldError = (field) => {
     setModalFieldErrors(prev => ({ ...prev, [field]: '' }));
+  };
+
+  const handleCheckCedula = async (cedula) => {
+    try {
+      return await checkCedulaExists(cedula);
+    } catch {
+      return false;
+    }
   };
 
   const handleNewPaciente = () => {
@@ -137,7 +145,7 @@ export default function PacientesPage() {
       const serverMsg = err?.message || JSON.stringify(err) || 'Error al guardar el paciente';
       const msgLower = String(serverMsg).toLowerCase();
       const fieldErrs = {};
-      if (msgLower.includes('cedula') || msgLower.includes('cédula')) fieldErrs.id_cedula = serverMsg;
+      if (msgLower.includes('cedula') || msgLower.includes('cédula') || msgLower.includes('duplicate') || msgLower.includes('unique constraint') || msgLower.includes('llave duplicada')) fieldErrs.id_cedula = 'La cédula ya está registrada';
       if (msgLower.includes('nombre')) fieldErrs.nombre = serverMsg;
       if (msgLower.includes('apellido')) fieldErrs.apellido = serverMsg;
       if (msgLower.includes('fecha') || msgLower.includes('nacimiento')) fieldErrs.fecha_nacimiento = serverMsg;
@@ -221,6 +229,7 @@ export default function PacientesPage() {
         isEditing={modalMode === 'edit'}
         externalErrors={modalFieldErrors}
         onClearExternalError={handleClearFieldError}
+        onCheckCedula={handleCheckCedula}
       />
       <ConfirmModal
         isOpen={confirmOpen}

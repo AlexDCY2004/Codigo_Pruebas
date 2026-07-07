@@ -54,22 +54,22 @@ export default function DoctorModal({ isOpen, onClose, onSubmit, initialData, is
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+      <div className="modal-content modal-content--doctor" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>{readOnly ? 'Ver Odontólogo' : (initialData?.id ? 'Editar Odontólogo' : 'Nuevo Odontólogo')}</h2>
           <button type="button" className="modal-close" onClick={onClose}>✕</button>
         </div>
-        <form onSubmit={handleSubmit} noValidate>
+        <form onSubmit={handleSubmit} noValidate className="doctor-form">
           {externalError && <div className="alert alert-error" style={{ marginBottom: '0.75rem' }}>{externalError}</div>}
 
           {readOnly ? (
-            <>
+            <div className="doctor-read-grid">
               <ReadRow label="Nombre:" value={formData.nombre} />
               <ReadRow label="Teléfono:" value={formData.telefono} />
               <ReadRow label="Correo:" value={formData.correo} />
               <ReadRow label="Especialidad:" value={formData.especialidad} />
               <ReadRow label="Estado:" value={formData.estado} />
-            </>
+            </div>
           ) : (
             <>
               <div className="form-group">

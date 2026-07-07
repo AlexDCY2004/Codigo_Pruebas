@@ -38,3 +38,13 @@ export const deletePaciente = async (id) => {
   const { error } = await supabase.from('paciente').delete().eq('id_cedula', id);
   if (error) throw error;
 };
+
+export const checkCedulaExists = async (cedula) => {
+  const { data, error } = await supabase
+    .from('paciente')
+    .select('id_cedula')
+    .eq('id_cedula', cedula)
+    .maybeSingle();
+  if (error) throw error;
+  return !!data;
+};

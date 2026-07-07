@@ -46,6 +46,12 @@ export default function TratamientoModal({ isOpen, onClose, onSubmit, initialDat
   const handleChange = (e) => {
     if (readOnly) return;
     const { name, value } = e.target;
+    if (name === 'precio') {
+      if (value === '' || /^\d{1,4}(\.\d{0,2})?$/.test(value)) {
+        setFormData(prev => ({ ...prev, precio: value }));
+      }
+      return;
+    }
     setFormData(prev => ({ ...prev, [name]: value }));
     if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' }));
     if (serverFieldErrors[name] && clearServerFieldErrors) clearServerFieldErrors(name);
@@ -72,16 +78,16 @@ export default function TratamientoModal({ isOpen, onClose, onSubmit, initialDat
           <h2>{readOnly ? 'Ver Tratamiento' : (initialData?.id ? 'Editar Tratamiento' : 'Nuevo Tratamiento')}</h2>
           <button type="button" className="modal-close" onClick={onClose}>✕</button>
         </div>
-        <form onSubmit={handleSubmit} noValidate>
+        <form onSubmit={handleSubmit} noValidate className={`tratamiento-form${readOnly ? ' tratamiento-form--readonly' : ''}`}>
           {serverError && <div className="alert alert-error" style={{ marginBottom: '0.75rem' }}>{serverError}</div>}
 
           {readOnly ? (
-            <>
+            <div className="tratamiento-read-grid">
               <ReadRow label="Área:" value={formData.area} />
               <ReadRow label="Nombre:" value={formData.nombre} />
               <ReadRow label="Precio:" value={formData.precio ? `$${Number(formData.precio).toFixed(2)}` : '-'} />
               <ReadRow label="Descripción:" value={formData.descripcion} />
-            </>
+            </div>
           ) : (
             <>
               <div className="form-group">
@@ -100,13 +106,14 @@ export default function TratamientoModal({ isOpen, onClose, onSubmit, initialDat
               <div className="form-row">
                 <div className="form-group">
                   <label htmlFor="precio">Precio *</label>
-                  <input type="number" id="precio" name="precio" value={formData.precio} onChange={handleChange} min="0.01" max="9999.99" step="0.01" className={allErrors.precio ? 'input-error' : ''} />
+                  <input type="text" id="precio" name="precio" value={formData.precio} onChange={handleChange} inputMode="decimal" placeholder="0.00" className={allErrors.precio ? 'input-error' : ''} />
                   {allErrors.precio && <span className="error-text">{allErrors.precio}</span>}
                 </div>
               </div>
               <div className="form-group">
                 <label htmlFor="descripcion">Descripción</label>
                 <textarea id="descripcion" name="descripcion" value={formData.descripcion} onChange={handleChange} placeholder="Descripción del tratamiento" rows={3} className={allErrors.descripcion ? 'input-error' : ''} />
+                <div className="char-counter">{formData.descripcion?.length || 0}/300</div>
                 {allErrors.descripcion && <span className="error-text">{allErrors.descripcion}</span>}
               </div>
             </>

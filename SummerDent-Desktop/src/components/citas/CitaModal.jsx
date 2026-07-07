@@ -14,6 +14,17 @@ const getInitialFormData = (initialData) => ({
   detalle_pago: initialData?.detalle_pago || ''
 });
 
+const getTodayLocal = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+const getMaxDateLocal = () => {
+  const d = new Date();
+  d.setMonth(d.getMonth() + 2);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
 export default function CitaModal({ isOpen, onClose, onSubmit, initialData, isLoading, pacientes = [], doctores = [], tratamientos = [], readOnly = false, isEditing = false, externalErrors = {} }) {
   const [formData, setFormData] = useState(() => getInitialFormData(initialData));
   const [selectedTratamientoIds, setSelectedTratamientoIds] = useState([]);
@@ -48,6 +59,12 @@ export default function CitaModal({ isOpen, onClose, onSubmit, initialData, isLo
   const handleChange = (e) => {
     if (readOnly) return;
     const { name, value } = e.target;
+    if (name === 'precio') {
+      if (value === '' || /^\d{1,4}(\.\d{0,2})?$/.test(value)) {
+        setFormData(prev => ({ ...prev, precio: value }));
+      }
+      return;
+    }
     setFormData(prev => ({ ...prev, [name]: value }));
     if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' }));
   };
@@ -76,8 +93,11 @@ export default function CitaModal({ isOpen, onClose, onSubmit, initialData, isLo
     if (!formData.id_paciente) newErrors.id_paciente = 'Paciente requerido';
     if (!formData.id_doctor) newErrors.id_doctor = 'Odontólogo requerido';
     if (!formData.fecha) newErrors.fecha = 'Fecha requerida';
+    else if (formData.fecha < getTodayLocal()) newErrors.fecha = 'La fecha no puede ser anterior a hoy';
+    else if (formData.fecha > getMaxDateLocal()) newErrors.fecha = 'La fecha máxima permitida es 2 meses a partir de hoy';
     if (!formData.hora_inicio) newErrors.hora_inicio = 'Hora inicio requerida';
     if (!formData.hora_fin) newErrors.hora_fin = 'Hora fin requerida';
+    if (formData.hora_inicio && formData.hora_fin && formData.hora_inicio >= formData.hora_fin) newErrors.hora_fin = 'La hora de fin debe ser mayor a la hora de inicio';
     if (formData.estado === 'Atendida' && !formData.metodo_pago) newErrors.metodo_pago = 'Método de pago requerido para marcar como atendida';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -157,7 +177,7 @@ export default function CitaModal({ isOpen, onClose, onSubmit, initialData, isLo
             <div className="form-group">
               <label>Fecha *</label>
               {readOnly ? <div className="field-value">{formData.fecha}</div> : (
-                <input type="date" name="fecha" value={formData.fecha} onChange={handleChange} className={errors.fecha ? 'input-error' : ''} />
+                <input type="date" name="fecha" value={formData.fecha} onChange={handleChange} min={getTodayLocal()} max={getMaxDateLocal()} className={errors.fecha ? 'input-error' : ''} />
               )}
               {errors.fecha && <span className="error-text">{errors.fecha}</span>}
             </div>
@@ -196,7 +216,7 @@ export default function CitaModal({ isOpen, onClose, onSubmit, initialData, isLo
             <div className="form-group">
               <label>Precio</label>
               {readOnly ? <div className="field-value">${Number(formData.precio || 0).toFixed(2)}</div> : (
-                <input type="number" name="precio" value={formData.precio} onChange={handleChange} min="0" step="0.01" />
+                <input type="text" name="precio" value={formData.precio} onChange={handleChange} inputMode="decimal" placeholder="0.00" />
               )}
             </div>
             <div className="form-group">

@@ -51,70 +51,106 @@
 }
 
 .tratamiento-form {
-  padding: 1.5rem;
+  padding: 1.75rem 2rem;
 }
 
 .tratamiento-form--readonly {
-  padding-top: 1rem;
+  padding-top: 1.25rem;
+}
+
+.tratamiento-read-grid {
+  display: grid;
+  gap: 0.25rem;
 }
 
 .tratamiento-read-row {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.75rem 0;
+  padding: 0.85rem 1rem;
   border-bottom: 1px solid #e9ecef;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+
+.tratamiento-read-row:hover {
+  background: #f8faff;
 }
 
 .tratamiento-read-label {
-  flex: 0 0 32%;
+  flex: 0 0 28%;
   color: #1a2fd1;
   font-weight: 700;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 
 .tratamiento-read-value {
   flex: 1;
   color: #1f2937;
   word-break: break-word;
+  font-size: 0.95rem;
 }
 
 .tratamiento-form--readonly .modal-footer {
   justify-content: flex-end;
-  margin-top: 1rem;
+  margin-top: 1.25rem;
 }
 
-.tratamiento-form .form-group {
-  margin-bottom: 1rem;
+.tratamiento-form > .form-group {
+  margin-bottom: 1.35rem;
 }
 
 .tratamiento-form label {
   display: block;
   margin-bottom: 0.5rem;
-  font-weight: 500;
+  font-weight: 600;
   color: #1d3354;
+  font-size: 0.88rem;
 }
 
 .tratamiento-form input,
-.tratamiento-form select {
+.tratamiento-form select,
+.tratamiento-form textarea {
   width: 100%;
-  padding: 0.75rem;
-  border: 1px solid #dce5f0;
-  border-radius: 8px;
+  padding: 0.75rem 0.9rem;
+  border: 1.5px solid #dce5f0;
+  border-radius: 10px;
   font-size: 0.95rem;
   color: #23324a;
   background: #fff;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  font-family: inherit;
 }
 
 .tratamiento-form input:focus,
-.tratamiento-form select:focus {
+.tratamiento-form select:focus,
+.tratamiento-form textarea:focus {
   outline: none;
   border-color: #3b82f6;
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
 }
 
-.tratamiento-form .input-error {
+.tratamiento-form input.input-error,
+.tratamiento-form select.input-error,
+.tratamiento-form textarea.input-error {
   border-color: #ef4444;
   background: rgba(239, 68, 68, 0.04);
+}
+
+.tratamiento-form textarea {
+  resize: vertical;
+  min-height: 80px;
+  line-height: 1.5;
+}
+
+.char-counter {
+  text-align: right;
+  font-size: 0.75rem;
+  color: #8a9bb5;
+  margin-top: 0.3rem;
+  padding-right: 0.2rem;
 }
 
 @media (max-width: 1100px) {
