@@ -2,14 +2,15 @@
 // Custom Commands for SummerDent - Versión Estable
 // ***********************************************
 
-Cypress.Commands.add('login', (email = 'jp@summerDent.com', password = 'jp123') => {
+Cypress.Commands.add('login', (email = 'dc@summerDent.com', password = 'dc272004') => {
+  cy.clearAllLocalStorage();
   cy.visit('/login');
   cy.url().then((url) => {
     if (url.includes('/dashboard')) return;
     cy.get('#email', { timeout: 15000 }).should('be.visible').clear().type(email);
     cy.get('#password').clear().type(password);
     cy.get('button[type="submit"]').click();
-    cy.url().should('include', '/dashboard');
+    cy.url({ timeout: 15000 }).should('include', '/dashboard');
   });
 });
 
@@ -29,7 +30,7 @@ Cypress.Commands.add('searchInTable', (term) => {
 });
 
 Cypress.Commands.add('createDoctor', (name, phone, email, specialty) => {
-  cy.navigateSideBar('Odontologos');
+  cy.navigateSideBar('Odontólogos');
   cy.contains('+ Nuevo Odontólogo', { timeout: 10000 }).should('be.visible').click();
   cy.get('#nombre').clear().type(name);
   cy.get('#telefono').clear().type(phone);

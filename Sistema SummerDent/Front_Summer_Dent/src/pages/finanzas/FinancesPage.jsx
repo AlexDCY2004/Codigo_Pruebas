@@ -234,6 +234,7 @@ export default function FinancesPage() {
                 type="date"
                 className="search-input finance-date-input"
                 value={desde}
+                max={hasta || ''}
                 onChange={(event) => setDesde(event.target.value)}
                 placeholder="Desde"
               />
@@ -246,6 +247,7 @@ export default function FinancesPage() {
                 type="date"
                 className="search-input finance-date-input"
                 value={hasta}
+                min={desde || ''}
                 onChange={(event) => setHasta(event.target.value)}
                 placeholder="Hasta"
               />

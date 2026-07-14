@@ -100,8 +100,8 @@ export default function TratamientoModal({
       const letras = (limpio.match(/[A-Za-zÁÉÍÓÚáéíóúÑñ]/g) || []).length;
       if (letras < 5) {
         nextErrors.nombre = 'El nombre debe contener al menos 5 letras';
-      } else if (limpio.length > 64) {
-        nextErrors.nombre = 'El nombre no puede superar 64 caracteres';
+      } else if (limpio.length > 30) {
+        nextErrors.nombre = 'El nombre no puede superar 30 caracteres';
       } else if (!/^[A-Za-z0-9ÁÉÍÓÚáéíóúÑñ\s\-.,]+$/.test(limpio)) {
         nextErrors.nombre = 'El nombre contiene caracteres inválidos';
       }
@@ -137,12 +137,19 @@ export default function TratamientoModal({
     // sanitize specific fields while typing
     let nextValue = value;
     if (name === 'nombre') {
+      if (value.length > 30) return;
       // sanitize: remove '@' and other disallowed chars as user types
       nextValue = value.replace(/[^A-Za-z0-9ÁÉÍÓÚáéíóúÑñ\s\-.,]/g, '');
     }
     if (name === 'descripcion') {
       // disallow the '@' character in descripcion
       nextValue = value.replace(/@/g, '');
+    }
+    if (name === 'precio') {
+      // only allow up to 4 digits and 2 decimals while typing
+      const filtered = value.replace(/[^0-9.]/g, '');
+      if (!/^\d{0,4}(\.\d{0,2})?$/.test(filtered)) return;
+      nextValue = filtered;
     }
 
     setFormData((prev) => ({
@@ -279,9 +286,8 @@ export default function TratamientoModal({
                   <input
                     id="precio"
                     name="precio"
-                    type="number"
-                    step="0.01"
-                    min="0"
+                    type="text"
+                    inputMode="decimal"
                     value={formData.precio}
                     onChange={handleChange}
                     onInvalid={(e) => e.preventDefault()}

@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { checkDisponibilidad } from '../../services/api/citas';
 
 const normalizeText = (value) => String(value || '').trim().toLowerCase();
 
@@ -90,8 +91,8 @@ const getDateOffsetMonths = (months) => {
 };
 
 const getCitaDateWindow = () => ({
-  minDate: getDateOffsetMonths(-2),
-  maxDate: getDateOffsetMonths(3)
+  minDate: getDateOffsetMonths(0),
+  maxDate: getDateOffsetMonths(2)
 });
 
 const isFechaCitaWithinWindow = (fecha) => {
@@ -236,13 +237,15 @@ export default function CitaModal({ isOpen, onClose, onSubmit, initialData, isLo
     }
     if (!formData.fecha) newErrors.fecha = 'Fecha requerida';
     else {
-      // bloquear fechas fuera de la ventana permitida: 2 meses antes y 3 meses después de hoy
+      // bloquear fechas fuera de la ventana permitida: desde hoy hasta 2 meses
       try {
         const { minDate, maxDate } = getCitaDateWindow();
         const fechaValue = String(formData.fecha).split('T')[0];
 
-        if (fechaValue < minDate || fechaValue > maxDate) {
-          newErrors.fecha = `La fecha debe estar entre ${minDate} y ${maxDate}`;
+        if (fechaValue < minDate) {
+          newErrors.fecha = 'La fecha no puede ser anterior a hoy';
+        } else if (fechaValue > maxDate) {
+          newErrors.fecha = `La fecha no puede superar ${maxDate} (máximo 2 meses)`;
         }
       } catch {
         // ignore parsing errors, other validations will catch invalid formats
@@ -283,6 +286,68 @@ export default function CitaModal({ isOpen, onClose, onSubmit, initialData, isLo
     return Object.keys(newErrors).length === 0;
   };
 
+  const checkHorarioDisponible = async () => {
+    const idDoctor = formData.id_doctor;
+    const fecha = formData.fecha;
+    const horaInicio = formData.hora_inicio;
+    const horaFin = formData.hora_fin;
+    if (!idDoctor || !fecha || !horaInicio || !horaFin) return true;
+    try {
+      const result = await checkDisponibilidad({
+        idDoctor,
+        fecha,
+        horaInicio,
+        horaFin,
+        exclude: initialData?.id || undefined
+      });
+      if (!result.disponible) {
+        setErrors((prev) => ({
+          ...prev,
+          _form: `El horario se solapa con otra cita (${result.conflictoCon.hora_inicio} - ${result.conflictoCon.hora_fin})`
+        }));
+        return false;
+      }
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next._form;
+        return next;
+      });
+      return true;
+    } catch (error) {
+      const serverMessage = error?.response?.data?.error || error?.message || 'No se pudo verificar la disponibilidad';
+      if (error?.response?.status === 409) {
+        setErrors((prev) => ({
+          ...prev,
+          _form: serverMessage
+        }));
+        return false;
+      }
+
+      return true;
+    }
+  };
+
+  useEffect(() => {
+    if (isReadOnly) return undefined;
+
+    const hasAvailabilityFields = formData.id_doctor && formData.fecha && formData.hora_inicio && formData.hora_fin;
+    if (!hasAvailabilityFields) {
+      setErrors((prev) => {
+        if (!prev._form) return prev;
+        const next = { ...prev };
+        delete next._form;
+        return next;
+      });
+      return undefined;
+    }
+
+    const timer = setTimeout(() => {
+      checkHorarioDisponible();
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [formData.id_doctor, formData.fecha, formData.hora_inicio, formData.hora_fin, isReadOnly]);
+
   const validateField = (fieldName) => {
     const newErrors = { ...(errors || {}) };
 
@@ -293,8 +358,10 @@ export default function CitaModal({ isOpen, onClose, onSubmit, initialData, isLo
           const { minDate, maxDate } = getCitaDateWindow();
           const fechaValue = String(formData.fecha).split('T')[0];
 
-          if (fechaValue < minDate || fechaValue > maxDate) {
-            newErrors.fecha = `La fecha debe estar entre ${minDate} y ${maxDate}`;
+          if (fechaValue < minDate) {
+            newErrors.fecha = 'La fecha no puede ser anterior a hoy';
+          } else if (fechaValue > maxDate) {
+            newErrors.fecha = `La fecha no puede superar ${maxDate} (máximo 2 meses)`;
           } else {
             delete newErrors.fecha;
           }
@@ -343,6 +410,9 @@ export default function CitaModal({ isOpen, onClose, onSubmit, initialData, isLo
     }
 
     setErrors(newErrors);
+    if ((fieldName === 'fecha' || fieldName === 'hora_inicio' || fieldName === 'hora_fin') && !newErrors.fecha && !newErrors.hora_inicio && !newErrors.hora_fin) {
+      checkHorarioDisponible();
+    }
   };
 
   const handleChange = (e) => {
@@ -427,30 +497,31 @@ export default function CitaModal({ isOpen, onClose, onSubmit, initialData, isLo
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (isReadOnly) return;
-    if (validateForm()) {
-      // Si cambia a Atendida desde otro estado y aún no tenemos metodo_pago, abrir modal
-      const willAttend = String(formData.estado) === 'Atendida';
-      const wasAttended = initialData && String(initialData.estado) === 'Atendida';
+    if (!validateForm()) return;
+    const disponible = await checkHorarioDisponible();
+    if (!disponible) return;
+    // Si cambia a Atendida desde otro estado y aún no tenemos metodo_pago, abrir modal
+    const willAttend = String(formData.estado) === 'Atendida';
+    const wasAttended = initialData && String(initialData.estado) === 'Atendida';
 
-      if (willAttend && !wasAttended && !(formData.metodo_pago || paymentMethod)) {
-        setPaymentErrors({});
-        // Si aún no se han completado los datos de pago mostramos la sección inline
-        setIsPaymentModalOpen(true);
-        return;
-      }
-
-      onSubmit({
-        ...formData,
-        id_doctor: Number(formData.id_doctor),
-        tratamientos: (formData.tratamientos || []).map((id) => Number(id)),
-        precio: Number(Number((formData.precio !== undefined && formData.precio !== '') ? formData.precio : computedPrecio).toFixed(2)),
-        metodo_pago: formData.metodo_pago || paymentMethod,
-        detalle_pago: formData.detalle_pago || paymentDetail
-      });
+    if (willAttend && !wasAttended && !(formData.metodo_pago || paymentMethod)) {
+      setPaymentErrors({});
+      // Si aún no se han completado los datos de pago mostramos la sección inline
+      setIsPaymentModalOpen(true);
+      return;
     }
+
+    onSubmit({
+      ...formData,
+      id_doctor: Number(formData.id_doctor),
+      tratamientos: (formData.tratamientos || []).map((id) => Number(id)),
+      precio: Number(Number((formData.precio !== undefined && formData.precio !== '') ? formData.precio : computedPrecio).toFixed(2)),
+      metodo_pago: formData.metodo_pago || paymentMethod,
+      detalle_pago: formData.detalle_pago || paymentDetail
+    });
   };
 
   // Nota: la sección de pago ahora está integrada inline en el modal; los valores

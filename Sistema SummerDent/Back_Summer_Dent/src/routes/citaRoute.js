@@ -4,11 +4,13 @@ import {
   obtenerCitasController,
   obtenerCitaPorIdController,
   actualizarCitaController,
-  eliminarCitaController
+  eliminarCitaController,
+  verificarDisponibilidadController
 } from '../controllers/citaController.js';
 
 const router = Router();
 
+router.get('/disponibilidad', verificarDisponibilidadController);
 router.get('/', obtenerCitasController);
 router.get('/:id', obtenerCitaPorIdController);
 router.post('/', crearCitaController);

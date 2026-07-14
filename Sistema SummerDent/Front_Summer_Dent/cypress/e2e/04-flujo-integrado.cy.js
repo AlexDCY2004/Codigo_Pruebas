@@ -1,4 +1,4 @@
-describe('Flujo Integrado: Doctor -> Paciente -> Cita', () => {
+describe('Flujo Integrado: Doctor -> Paciente -> Cita', { testIsolation: false }, () => {
   const uniqueId = Date.now().toString().slice(-4);
   // El front elimina números en nombres y apellidos. Usamos letras únicas.
   const doctorName = `Doctor Juan Perez`; 
@@ -28,12 +28,11 @@ describe('Flujo Integrado: Doctor -> Paciente -> Cita', () => {
   before(() => {
     cy.login();
     // No creamos tratamiento porque jp@summerDent.com no tiene permisos de admin
-    cy.createDoctor(doctorName, '0990001111', `doc_${uniqueId}@test.com`, 'Ortodoncia');
-    cy.createPatient(patientId, patientName, patientLastName, '1988-10-10', '0998887777', `pat_${uniqueId}@test.com`);
+    cy.createDoctor(doctorName, '0990001122', `doc_${uniqueId}@test.com`, 'Ortodoncia');
+    cy.createPatient(patientId, patientName, patientLastName, '1988-10-10', '0998883477', `pat_${uniqueId}@test.com`);
   });
 
   beforeEach(() => {
-    cy.login();
     cy.visit('/citas');
   });
 
@@ -91,5 +90,19 @@ describe('Flujo Integrado: Doctor -> Paciente -> Cita', () => {
     
     // Buscar el texto de error de forma global para evitar fallos por selectores anidados
     cy.contains('La fecha no puede ser anterior a hoy', { timeout: 10000 }).should('be.visible');
+  });
+
+  it('Debe validar que la fecha no supere los 2 meses', () => {
+    cy.contains('+ Nueva Cita').click();
+
+    const futureDate = new Date();
+    futureDate.setMonth(futureDate.getMonth() + 3);
+    const farDateStr = futureDate.toISOString().split('T')[0];
+
+    cy.get('#fecha').type(farDateStr);
+
+    cy.get('.btn-modal-save').click({ force: true });
+
+    cy.contains('máximo 2 meses', { timeout: 10000 }).should('be.visible');
   });
 });

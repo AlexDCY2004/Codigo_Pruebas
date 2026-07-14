@@ -1,7 +1,7 @@
 describe('Módulo de Pacientes', () => {
   const uniqueId = Date.now().toString().slice(-4);
   // El front elimina números en nombres y apellidos.
-  const patientName = `Paciente Automatizado`;
+  const patientName = `Paciente Pedro`;
   const lastName = `Test`;
 
   // Algoritmo módulo 10 para cédula válida
@@ -38,8 +38,8 @@ describe('Módulo de Pacientes', () => {
     cy.get('#apellido').type(lastName);
     cy.get('#fecha_nacimiento').type('1995-05-15');
     cy.get('#telefono').type('0987654321');
-    cy.get('#correo').type(`paciente${uniqueId}@gmail.com`);
-    cy.get('#direccion').type('Calle Falsa 123');
+    cy.get('#correo').type(`pacienteP${uniqueId}@gmail.com`);
+    cy.get('#direccion').type('Calle La lomas');
     
     cy.get('.btn-modal-save').click();
     

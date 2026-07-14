@@ -34,6 +34,24 @@ const computeAgeFromDate = (fecha) => {
   }
 };
 
+const validarCedulaEcuatoriana = (cedula) => {
+  if (!/^\d{10}$/.test(cedula)) return false;
+  const provincia = parseInt(cedula.substring(0, 2), 10);
+  if (provincia < 1 || provincia > 24) return false;
+  const tercerDigito = parseInt(cedula[2], 10);
+  if (tercerDigito < 0 || tercerDigito > 5) return false;
+  const coef = [2, 1, 2, 1, 2, 1, 2, 1, 2];
+  let suma = 0;
+  for (let i = 0; i < 9; i++) {
+    let valor = parseInt(cedula[i], 10) * coef[i];
+    if (valor >= 10) valor -= 9;
+    suma += valor;
+  }
+  const digitoVerificador = parseInt(cedula[9], 10);
+  const calculado = suma % 10 === 0 ? 0 : 10 - (suma % 10);
+  return digitoVerificador === calculado;
+};
+
 export default function PacienteModal({ isOpen, onClose, onSubmit, initialData, isLoading, readOnly = false, isEditing = false, externalErrors = {}, onClearExternalError }) {
   const [formData, setFormData] = useState(() => getInitialFormData(initialData));
   const [errors, setErrors] = useState({});
@@ -46,10 +64,25 @@ export default function PacienteModal({ isOpen, onClose, onSubmit, initialData, 
       newErrors.id_cedula = 'Cédula requerida';
     } else if (formData.id_cedula.trim().length !== 10) {
       newErrors.id_cedula = 'La cédula debe tener 10 dígitos';
+    } else if (!validarCedulaEcuatoriana(formData.id_cedula.trim())) {
+      newErrors.id_cedula = 'La cédula ingresada no es válida';
     }
 
-    if (!formData.nombre?.trim()) newErrors.nombre = 'Nombre requerido';
-    if (!formData.apellido?.trim()) newErrors.apellido = 'Apellido requerido';
+    if (!formData.nombre?.trim()) {
+      newErrors.nombre = 'Nombre requerido';
+    } else if (formData.nombre.trim().length < 2) {
+      newErrors.nombre = 'El nombre debe tener al menos 2 caracteres';
+    } else if (formData.nombre.trim().length > 45) {
+      newErrors.nombre = 'El nombre no puede tener más de 45 caracteres';
+    }
+
+    if (!formData.apellido?.trim()) {
+      newErrors.apellido = 'Apellido requerido';
+    } else if (formData.apellido.trim().length < 2) {
+      newErrors.apellido = 'El apellido debe tener al menos 2 caracteres';
+    } else if (formData.apellido.trim().length > 45) {
+      newErrors.apellido = 'El apellido no puede tener más de 45 caracteres';
+    }
 
     // Fecha de nacimiento: requerida y al menos 2 años, máximo 60
     if (!formData.fecha_nacimiento) {

@@ -12,9 +12,9 @@ describe('Módulo de Tratamientos', () => {
     
     cy.contains('+ Nuevo Tratamiento').click();
     cy.get('#nombre').type(treatmentName);
-    cy.get('#area').select('Ortodoncia General');
-    cy.get('#precio').clear().type('120.50');
-    cy.get('#descripcion').type('Limpieza profunda automatizada');
+    cy.get('#area').select('Ortodoncia General Prueba 2');
+    cy.get('#precio').clear().type('1200.50');
+    cy.get('#descripcion').type('Limpieza profunda automatizada con cypress y pulido final.');
     cy.get('.btn-modal-save').click();
     
     cy.wait('@saveRequest', { timeout: 10000 }).then((interception) => {

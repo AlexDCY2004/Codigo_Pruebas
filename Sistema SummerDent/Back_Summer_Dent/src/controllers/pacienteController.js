@@ -14,6 +14,8 @@ const esTextoValido = (valor, min, max) => {
   return limpio.length >= min && limpio.length <= max;
 };
 
+const esIdValido = (id) => /^\d+$/.test(String(id || '').trim()) && Number(String(id).trim()) > 0;
+
 const esCedulaValida = (cedula) => {
   if (typeof cedula !== 'string' && typeof cedula !== 'number') return false;
   const limpia = String(cedula).trim();
@@ -94,8 +96,8 @@ export const crearPacienteController = async (req, res) => {
     if (!apellido || !String(apellido).trim()) return res.status(400).json({ error: 'El apellido es obligatorio' });
 
     if (!esCedulaValida(id_cedula)) return res.status(400).json({ error: 'Cédula inválida' });
-    if (!esTextoValido(nombre, 2, 15)) return res.status(400).json({ error: 'El nombre debe tener entre 2 y 15 caracteres' });
-    if (!esTextoValido(apellido, 2, 15)) return res.status(400).json({ error: 'El apellido debe tener entre 2 y 15 caracteres' });
+    if (!esTextoValido(nombre, 2, 45)) return res.status(400).json({ error: 'El nombre debe tener entre 2 y 45 caracteres' });
+    if (!esTextoValido(apellido, 2, 45)) return res.status(400).json({ error: 'El apellido debe tener entre 2 y 45 caracteres' });
     if (!esNombreValido(nombre)) return res.status(400).json({ error: 'El nombre solo debe contener letras y espacios' });
     if (!esNombreValido(apellido)) return res.status(400).json({ error: 'El apellido solo debe contener letras y espacios' });
     if (!esFechaNacimientoValida(fecha_nacimiento)) return res.status(400).json({ error: 'La fecha de nacimiento es obligatoria, debe estar en formato YYYY-MM-DD y no puede ser futura' });
@@ -255,8 +257,8 @@ export const actualizarPacienteController = async (req, res) => {
 
     if (nombre !== undefined && !String(nombre).trim()) return res.status(400).json({ error: 'El nombre no puede estar vacío' });
     if (apellido !== undefined && !String(apellido).trim()) return res.status(400).json({ error: 'El apellido no puede estar vacío' });
-    if (nombre !== undefined && !esTextoValido(nombre, 2, 15)) return res.status(400).json({ error: 'El nombre debe tener entre 2 y 15 caracteres' });
-    if (apellido !== undefined && !esTextoValido(apellido, 2, 15)) return res.status(400).json({ error: 'El apellido debe tener entre 2 y 15 caracteres' });
+    if (nombre !== undefined && !esTextoValido(nombre, 2, 45)) return res.status(400).json({ error: 'El nombre debe tener entre 2 y 45 caracteres' });
+    if (apellido !== undefined && !esTextoValido(apellido, 2, 45)) return res.status(400).json({ error: 'El apellido debe tener entre 2 y 45 caracteres' });
     if (nombre !== undefined && !esNombreValido(nombre)) return res.status(400).json({ error: 'El nombre solo debe contener letras y espacios' });
     if (apellido !== undefined && !esNombreValido(apellido)) return res.status(400).json({ error: 'El apellido solo debe contener letras y espacios' });
     if (fecha_nacimiento !== undefined && fecha_nacimiento !== null && fecha_nacimiento !== '' && !esFechaNacimientoValida(fecha_nacimiento)) return res.status(400).json({ error: 'La fecha de nacimiento debe estar en formato YYYY-MM-DD y no puede ser futura' });
@@ -288,12 +290,11 @@ export const actualizarPacienteController = async (req, res) => {
     if (correo !== undefined) updates.correo = correoLimpioUpdate || null;
     if (direccion !== undefined) updates.direccion = direccion ? String(direccion).trim() : null;
     if (Object.prototype.hasOwnProperty.call(req.body, 'sede_id')) {
-      if (!(perfil && perfil.rol === 'superadmin')) {
-        return res.status(403).json({ error: 'No autorizado para asignar sede' });
+      if (perfil && perfil.rol === 'superadmin') {
+        const sedeNum = Number(req.body.sede_id);
+        if (Number.isNaN(sedeNum)) return res.status(400).json({ error: 'sede_id inválido' });
+        updates.sede_id = sedeNum;
       }
-      const sedeNum = Number(req.body.sede_id);
-      if (Number.isNaN(sedeNum)) return res.status(400).json({ error: 'sede_id inválido' });
-      updates.sede_id = sedeNum;
     }
 
     if (Object.keys(updates).length === 0) {

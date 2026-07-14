@@ -31,8 +31,8 @@ const getDateOffsetMonths = (months) => {
 };
 
 const getCitaDateWindow = () => ({
-  minDate: getDateOffsetMonths(-2),
-  maxDate: getDateOffsetMonths(3)
+  minDate: getDateOffsetMonths(0),
+  maxDate: getDateOffsetMonths(2)
 });
 
 const esFechaCitaDentroDeVentana = (fecha) => {
@@ -41,6 +41,60 @@ const esFechaCitaDentroDeVentana = (fecha) => {
   const { minDate, maxDate } = getCitaDateWindow();
   return value >= minDate && value <= maxDate;
 };
+
+const verificarDisponibilidadCita = async (supabaseUser, fecha, horaInicio, horaFin, excludeId = null, sedeId = null) => {
+  let query = supabaseUser
+    .from('cita')
+    .select('id, hora_inicio, hora_fin, estado, id_doctor, sede_id')
+    .eq('fecha', String(fecha))
+    .not('estado', 'in', '("Atendida","cancelada")');
+
+  if (sedeId !== undefined && sedeId !== null && String(sedeId).trim() !== '') {
+    query = query.eq('sede_id', Number(sedeId));
+  }
+
+  const { data: citasExistentes, error } = await query;
+  if (error) throw error;
+  if (!citasExistentes || citasExistentes.length === 0) return { disponible: true };
+
+  const nuevaInicio = String(horaInicio).slice(0, 5);
+  const nuevaFin = String(horaFin).slice(0, 5);
+
+  for (const cita of citasExistentes) {
+    if (excludeId && String(cita.id) === String(excludeId)) continue;
+    const existenteInicio = String(cita.hora_inicio).slice(0, 5);
+    const existenteFin = String(cita.hora_fin).slice(0, 5);
+    if (nuevaInicio < existenteFin && existenteInicio < nuevaFin) {
+      return {
+        disponible: false,
+        conflictoCon: { id: cita.id, hora_inicio: existenteInicio, hora_fin: existenteFin, id_doctor: cita.id_doctor, sede_id: cita.sede_id }
+      };
+    }
+  }
+  return { disponible: true };
+};
+
+export const verificarDisponibilidadController = async (req, res) => {
+  try {
+    const token = getAuthTokenFromReq(req);
+    if (!token) return res.status(401).json({ error: 'Token no proporcionado' });
+    const supabaseUser = getSupabaseClientWithToken(token);
+
+    const { fecha, hora_inicio, hora_fin, exclude, sede_id } = req.query;
+    if (!fecha || !hora_inicio || !hora_fin) {
+      return res.status(400).json({ error: 'fecha, hora_inicio y hora_fin son requeridos' });
+    }
+    if (!esFechaValida(fecha)) return res.status(400).json({ error: 'fecha inválida' });
+    if (!esHoraValida(hora_inicio) || !esHoraValida(hora_fin)) return res.status(400).json({ error: 'hora_inicio/hora_fin inválida' });
+
+    const dbDisponibilidad = supabaseAdmin || supabaseUser;
+    const disponibilidad = await verificarDisponibilidadCita(dbDisponibilidad, fecha, hora_inicio, hora_fin, exclude || null, sede_id || null);
+    return res.json(disponibilidad);
+  } catch (error) {
+    return res.status(500).json({ error: error.message || error });
+  }
+};
+
 const decodificarJwtPayload = (token) => {
   if (!token || typeof token !== 'string') return null;
   const partes = token.split('.');
@@ -107,11 +161,26 @@ export const crearCitaController = async (req, res) => {
     }
     if (!esFechaValida(fecha)) return res.status(400).json({ error: 'fecha inválida, formato YYYY-MM-DD' });
     if (!esFechaCitaDentroDeVentana(fecha)) {
-      const { minDate, maxDate } = getCitaDateWindow();
-      return res.status(400).json({ error: `La fecha de la cita debe estar entre ${minDate} y ${maxDate}` });
+      return res.status(400).json({ error: 'La fecha de la cita debe ser desde hoy hasta máximo 2 meses' });
     }
     if (!esHoraValida(hora_inicio) || !esHoraValida(hora_fin)) return res.status(400).json({ error: 'hora_inicio/hora_fin inválida, formato HH:MM ó HH:MM:SS' });
     if (estado !== undefined && estado !== null && !estadosPermitidos.includes(String(estado))) return res.status(400).json({ error: `estado inválido. Debe ser: ${estadosPermitidos.join(', ')}` });
+
+    const perfil = await getPerfilFromToken(token);
+
+    // Verificar disponibilidad del horario en esa sede (usar admin para ver TODAS las citas, no solo las del perfil)
+    try {
+      const dbDisponibilidad = supabaseAdmin || supabaseUser;
+      const sedeIdDisponibilidad = req.body?.sede_id ?? perfil?.sede_id ?? null;
+      const disponibilidad = await verificarDisponibilidadCita(dbDisponibilidad, fecha, hora_inicio, hora_fin, null, sedeIdDisponibilidad);
+      if (!disponibilidad.disponible) {
+        return res.status(409).json({
+          error: `El horario de ${hora_inicio} a ${hora_fin} ya tiene una cita agendada (${disponibilidad.conflictoCon.hora_inicio} - ${disponibilidad.conflictoCon.hora_fin})`
+        });
+      }
+    } catch (err) {
+      return res.status(500).json({ error: err.message || 'Error al verificar disponibilidad' });
+    }
 
     // Verificar que paciente, doctor y tratamiento (si aplica) existen — RLS aplica
     const { data: pacienteExist, error: pe } = await supabaseUser.from('paciente').select('id_cedula').eq('id_cedula', String(id_paciente).trim()).maybeSingle();
@@ -142,8 +211,6 @@ export const crearCitaController = async (req, res) => {
       if (!tratExist) return res.status(404).json({ error: 'Tratamiento no encontrado' });
       precioCalculado = Number(tratExist.precio || 0);
     }
-
-    const perfil = await getPerfilFromToken(token);
 
     const insertObj = {
       id_paciente: String(id_paciente).trim(),
@@ -326,7 +393,7 @@ export const actualizarCitaController = async (req, res) => {
     const camposNoPermitidos = camposRecibidos.filter((c) => !camposPermitidos.includes(c));
     if (camposNoPermitidos.length > 0) return res.status(400).json({ error: `Campos no permitidos: ${camposNoPermitidos.join(', ')}` });
 
-    const { data: existing, error: fetchErr } = await supabaseUser.from('cita').select('id, estado, precio, id_doctor, tratamientos, id_perfil').eq('id', Number(id)).maybeSingle();
+    const { data: existing, error: fetchErr } = await supabaseUser.from('cita').select('id, estado, precio, id_doctor, fecha, hora_inicio, hora_fin, tratamientos, id_perfil').eq('id', Number(id)).maybeSingle();
     if (fetchErr) return res.status(500).json({ error: fetchErr.message || fetchErr });
     if (!existing) return res.status(404).json({ error: 'Cita no encontrada' });
     if (String(existing.estado || '').toLowerCase() === 'atendida') {
@@ -379,8 +446,7 @@ export const actualizarCitaController = async (req, res) => {
     if (fecha !== undefined) {
       if (!esFechaValida(fecha)) return res.status(400).json({ error: 'fecha inválida, formato YYYY-MM-DD' });
       if (!esFechaCitaDentroDeVentana(fecha)) {
-        const { minDate, maxDate } = getCitaDateWindow();
-        return res.status(400).json({ error: `La fecha de la cita debe estar entre ${minDate} y ${maxDate}` });
+        return res.status(400).json({ error: 'La fecha de la cita debe ser desde hoy hasta máximo 2 meses' });
       }
       updates.fecha = String(fecha);
     }
@@ -392,6 +458,26 @@ export const actualizarCitaController = async (req, res) => {
       if (!esHoraValida(hora_fin)) return res.status(400).json({ error: 'hora_fin inválida' });
       updates.hora_fin = String(hora_fin);
     }
+
+    // Verificar disponibilidad del horario en esa sede (usar admin para ver TODAS las citas, no solo las del perfil)
+    try {
+      const dbDisponibilidad = supabaseAdmin || supabaseUser;
+      const fechaFinal = updates.fecha ?? String(existing.fecha || '').slice(0, 10);
+      const inicioFinal = updates.hora_inicio ?? String(existing.hora_inicio || '').slice(0, 5);
+      const finFinal = updates.hora_fin ?? String(existing.hora_fin || '').slice(0, 5);
+      const sedeIdFinal = updates.sede_id ?? existing.sede_id ?? null;
+      if (fechaFinal && inicioFinal && finFinal) {
+        const disponibilidad = await verificarDisponibilidadCita(dbDisponibilidad, fechaFinal, inicioFinal, finFinal, id, sedeIdFinal);
+        if (!disponibilidad.disponible) {
+          return res.status(409).json({
+            error: `El horario de ${inicioFinal} a ${finFinal} ya tiene una cita agendada (${disponibilidad.conflictoCon.hora_inicio} - ${disponibilidad.conflictoCon.hora_fin})`
+          });
+        }
+      }
+    } catch (err) {
+      return res.status(500).json({ error: err.message || 'Error al verificar disponibilidad' });
+    }
+
     // El precio explícito del formulario tiene prioridad sobre la sumatoria de tratamientos.
     // Si no viene precio, entonces se conserva el cálculo automático.
     if (precioExplicito) {

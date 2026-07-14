@@ -66,6 +66,10 @@ export default function DoctorModal({ isOpen, onClose, onSubmit, initialData, is
       nextErrors.nombre = 'El nombre es obligatorio';
     } else if (!/^[A-Za-zÁÉÍÓÚáéíóúÑñ.\s]+$/.test(formData.nombre.trim())) {
       nextErrors.nombre = 'El nombre solo debe contener letras, espacios o puntos';
+    } else if (formData.nombre.trim().length < 3) {
+      nextErrors.nombre = 'El nombre debe tener al menos 3 caracteres';
+    } else if (formData.nombre.trim().length > 50) {
+      nextErrors.nombre = 'El nombre no puede tener más de 50 caracteres';
     }
 
     if (!formData.telefono.trim()) {
@@ -94,6 +98,10 @@ export default function DoctorModal({ isOpen, onClose, onSubmit, initialData, is
         nextErrors.especialidad = 'La especialidad solo debe contener letras y comas';
       } else if (raw.replace(/[,\s]/g, '').length === 0) {
         nextErrors.especialidad = 'La especialidad no puede contener solo comas';
+      } else if (raw.length < 5) {
+        nextErrors.especialidad = 'La especialidad debe tener al menos 5 caracteres';
+      } else if (raw.length > 30) {
+        nextErrors.especialidad = 'La especialidad no puede tener más de 30 caracteres';
       }
     }
 
@@ -111,6 +119,7 @@ export default function DoctorModal({ isOpen, onClose, onSubmit, initialData, is
 
     // For nombre allow letters, spaces and dots only (sanitize as user types)
     if (name === 'nombre') {
+      if (value.length > 50) return;
       const sanitized = value.replace(/[^A-Za-zÁÉÍÓÚáéíóúÑñ.\s]/g, '');
       setFormData((prev) => ({ ...prev, [name]: sanitized }));
       if (errors[name]) {
@@ -121,6 +130,7 @@ export default function DoctorModal({ isOpen, onClose, onSubmit, initialData, is
 
     // For especialidad allow letters, spaces and commas only (sanitize as user types)
     if (name === 'especialidad') {
+      if (value.length > 30) return;
       const sanitized = value.replace(/[^A-Za-zÁÉÍÓÚáéíóúÑñ,\s]/g, '');
       setFormData((prev) => ({ ...prev, [name]: sanitized }));
       if (errors[name]) setErrors((prev) => ({ ...prev, [name]: '' }));

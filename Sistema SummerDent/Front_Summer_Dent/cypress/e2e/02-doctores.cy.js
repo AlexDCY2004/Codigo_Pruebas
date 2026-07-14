@@ -12,9 +12,9 @@ describe('Módulo de Odontólogos', () => {
     
     cy.contains('+ Nuevo Odontólogo').click();
     cy.get('#nombre').clear().type(doctorName);
-    cy.get('#telefono').clear().type('0991234567');
-    cy.get('#correo').clear().type(`doctor${uniqueId}@summerdent.com`);
-    cy.get('#especialidad').clear().type('Cirugia');
+    cy.get('#telefono').clear().type('0991234568');
+    cy.get('#correo').clear().type(`doctor${uniqueId}@summerdent1.com`);
+    cy.get('#especialidad').clear().type('Cirugia general');
     cy.get('#estado').select('disponible');
     
     cy.get('.btn-modal-save').click();

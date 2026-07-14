@@ -48,3 +48,15 @@ export const deleteCita = async (id) => {
     throw error;
   }
 };
+
+export const checkDisponibilidad = async ({ idDoctor, fecha, horaInicio, horaFin, exclude }) => {
+  try {
+    const params = { id_doctor: idDoctor, fecha, hora_inicio: horaInicio, hora_fin: horaFin };
+    if (exclude) params.exclude = exclude;
+    const response = await apiClient.get('/api/citas/disponibilidad', { params });
+    return response.data;
+  } catch (error) {
+    console.error('Error checking disponibilidad:', error);
+    throw error;
+  }
+};

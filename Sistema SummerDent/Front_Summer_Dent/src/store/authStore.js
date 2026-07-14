@@ -27,7 +27,7 @@ export const useAuthStore = create((set) => ({
   token: '',
   user: getStoredUser(),
   isAuthenticated: Boolean(getStoredUser()),
-  authReady: false,
+  authReady: true,
   sedeActiva: getStoredSedeActiva(),
   setAuthReady: (ready) => set({ authReady: Boolean(ready) }),
   setSession: ({ user }) => {
